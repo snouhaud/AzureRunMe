@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ServiceDefinition name="AzureRunMe" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition">
+  <WorkerRole name="WorkerRole" enableNativeCodeExecution="true" vmsize="Small">
+    <Endpoints>
+		<!-- See http://www.iana.org/assignments/port-numbers -->
+
+		<InputEndpoint name="telnet" port="23" protocol="tcp"/>
+		<InputEndpoint name="http" port="80" protocol="tcp" />
+
+		<InputEndpoint name="http-alt" port="8080" protocol="tcp"/>
+
+		<InternalEndpoint name="port1" protocol="tcp" />
+		<InternalEndpoint name="port2" protocol="tcp" />
+
+    </Endpoints>
+    
+	<LocalResources>
+		<LocalStorage name="MyAzureDriveCache"
+				cleanOnRoleRecycle="false"
+				sizeInMB="300" />
+	</LocalResources>
+
+    <ConfigurationSettings>
+		<Setting name="DataConnectionString" />
+		<Setting name="Packages" />
+		<Setting name="WorkingDirectory" />
+		<Setting name="Commands" />
+		<Setting name="OnStopCommands" />
+		
+		<Setting name="DefaultConnectionLimit" />
+
+		<Setting name="DiagnosticsConnectionString" />
+		<Setting name="ScheduledTransferLogLevelFilter" />
+		<Setting name="ScheduledTransferPeriod" />
+
+		<Setting name="TraceConnectionString" />
+		<Setting name="LogFormat" />
+		
+		<Setting name="CloudDriveConnectionString" />
+		<Setting name="CloudDrive" />
+		<Setting name="CloudDriveSize" />
+    </ConfigurationSettings>
+  </WorkerRole>
+</ServiceDefinition>

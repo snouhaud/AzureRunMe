@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<ServiceConfiguration serviceName="AzureRunMe" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceConfiguration">
+  <Role name="WorkerRole">
+    <Instances count="1" />
+    <ConfigurationSettings>
+		<Setting name="DataConnectionString" value="DefaultEndpointsProtocol=https;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
+		<Setting name="Packages" value="packages/jre.zip;packages/dist.zip" />
+		<Setting name="WorkingDirectory" value="$roleroot$" />
+		<Setting name="Commands" value="runme.bat" />
+		<Setting name="OnStopCommands" value="" />
+		
+		<Setting name="DefaultConnectionLimit" value="12" />
+
+		<Setting name="DiagnosticsConnectionString" value="DefaultEndpointsProtocol=https;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
+		<Setting name="ScheduledTransferLogLevelFilter" value="Verbose" />
+		<Setting name="ScheduledTransferPeriod" value="1" />
+
+		<Setting name="TraceConnectionString" value="ServicePath=trace/$roleinstanceid$;ServiceNamespace=YOURNAMESPACE;IssuerName=YOURISSUERNAME;IssuerSecret=YOURISSUERSECRET" />
+		<Setting name="LogFormat" value="$computername$: {0:u} {1}" />
+
+		<Setting name="CloudDriveConnectionString" value="DefaultEndpointsProtocol=http;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
+		<Setting name="CloudDrive" value ="drives\$computername$.vhd"/>
+		<Setting name="CloudDriveSize" value="64" />
+		
+    </ConfigurationSettings>
+  </Role>
+</ServiceConfiguration>
