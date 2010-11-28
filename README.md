@@ -24,22 +24,22 @@ Important Breaking  Changes
 
 The UploadBlob and DownloadBlob tools have been removed in favour of [AzureCommandLineTools](https://github.com/blackwre/AzureCommandLineTools).
 
-I used to use backslash (\) to separate package name from blob name in the packages configuration. I now use forward slash (/) for compatability
-with most oher Azure literature and tools. Sorry!
+I used to use backslash (\\) to separate package name from blob name in the packages configuration. I now use forward slash (/) for compatability
+with most other Azure literature and tools. Sorry!
 
 Example Scenarios
 -----------------
 
-Run one or more simple Java console apps
-One or more CSharp console apps,without any code change
-A Telnet server in Azure
-A Tomcat hosted web application
-A JBOSS hosted app
-A legacy C / C++ application
-A Clojure / Compojure app
-A Ruby on Rails web app
-Use PortBridgeAgent to proxy some ports from an intranet server e.g. LDAP.
-Use PortBridge to proxy internal endpoints back to on premises e.g. JPDA to your Eclipse debugger
+Run one or more simple Java console apps:
+* One or more CSharp console apps,without any code change
+* A Telnet server in Azure
+* A Tomcat hosted web application
+* A JBOSS hosted app
+* A legacy C / C++ application
+* A Clojure / Compojure app
+* A Ruby on Rails web app
+* Use PortBridgeAgent to proxy some ports from an intranet server e.g. LDAP.
+* Use PortBridge to proxy internal endpoints back to on premises e.g. JPDA to your Eclipse debugger
 
 Getting Started
 ---------------
@@ -48,15 +48,15 @@ Organise your project so that it can all run from under one directory and has a 
 
 In my case, I have a directory called c:\foo. Under that I have copied the Java Runtime JRE. I have my JAR files in a subdirectory called test and a runme.bat above those that looks like this:
 
-cd test
-..\jre\bin\java -cp Test.jar;lib\* Test %http%
+	cd test
+	..\jre\bin\java -cp Test.jar;lib\* Test %http%
 
 I can bring up a console window using cmd and change directory into Foo
 
 Then I can try things out locally by typing:
 
-C:>Foo> set http=8080
-C:>Foo> runme.bat
+	C:>Foo> set http=8080
+	C:>Foo> runme.bat
 
 The application runs and serves a web page on port 8080.
 
@@ -99,13 +99,13 @@ Environment Variables
 
 Before running your script, the following environment variables are set up
 
-%IPAddress% to the IP Address of this instance.
+* %IPAddress% to the IP Address of this instance.
 
-All InputEndPoints are setup too, according to the CSDEF, by default this is
+All InputEndPoints are setup too, according to the CSDEF, by default this is:
 
-%http% the port corresponding to 80
-%telnet% the port corresponding to 23
-%http-alt% the port corresponding to 8080
+* %http% the port corresponding to 80
+* %telnet% the port corresponding to 23
+* %http-alt% the port corresponding to 8080
 
 There are also two default InternalEndPoints %port1% and %port2%
 
@@ -129,7 +129,8 @@ The level of logging and the frequency (in minutes) with which logs are shipped 
 		<Setting name="ScheduledTransferLogLevelFilter" value="Verbose"/>
 		<Setting name="ScheduledTransferPeriod" value="1"/>
 
-I recommend Cerebrata's Windows Azure Diagostics aMnager for viewing the output. (I really ought to be on commission!).
+I recommend Cerebrata's [Windows Azure Diagostics Manager](http://www.cerebrata.com/products/AzureDiagnosticsManager/Default.aspx) for viewing
+the output. (I really ought to be on commission!).
 
 Packages
 --------
@@ -138,11 +139,11 @@ You store your packages as a series of ZIP files in Azure Blob Store
 
 The following config setting controls which files are extacted and in which order.
 
-		<Setting name="Packages" value="packages\jre.zip;packages\dist.zip" />
+		<Setting name="Packages" value="packages/jre.zip;packages/dist.zip" />
 
 It's usually a good idea to separate your deployment up into several packages so that you dont have large uploads everytime something changes. Here is a recent example
 
-	<Setting name="Packages" value="packages\jdk1.6.0_21.zip;packages\sed.zip;packages\portbridge.zip;packages\apache-tomcat-6.0.29.zip" />
+	<Setting name="Packages" value="packages/jdk1.6.0_21.zip;packages/sed.zip;packages/portbridge.zip;packages/apache-tomcat-6.0.29.zip" />
 
 Commands
 --------
@@ -173,17 +174,17 @@ With a fixed service path of trace/azurerunme, all service bus based tracing fro
 
 With multiple instances or multiple deployments that can be confusing - it's hard to see which instance wrote which message when they are interleaved.
 
-For that reason, the service path is configurable with some keyword expansions
+For that reason, the service path is configurable with some keyword expansions:
 
-$deploymentid$ expands to the deployment id - something like 3bdbf69e94c645f1ab19f2e428eb05fe
-$roleinstanceid$ expands to the role instance id - something like {"WorkerRole_IN_0"}
-$computername$ expands to the computer NETBIOS name - something like RD00155D3A111A
-$guid$ expands to a new Globally Unique Identifier
-$now$ expands to DateTime.Now (the current time).
-$roleroot$" expands to the role root directory
-$clouddrive$" expands to the directory where the clouddrive is mounted
+* $deploymentid$ expands to the deployment id - something like 3bdbf69e94c645f1ab19f2e428eb05fe
+* $roleinstanceid$ expands to the role instance id - something like {"WorkerRole_IN_0"}
+* $computername$ expands to the computer NETBIOS name - something like RD00155D3A111A
+* $guid$ expands to a new Globally Unique Identifier
+* $now$ expands to DateTime.Now (the current time).
+* $roleroot$" expands to the role root directory
+* $clouddrive$" expands to the directory where the clouddrive is mounted
 
-The default setting is now {"trace/$roleinstanceid$"} which with single instance deployments becomes "{trace/WorkerRole_IN_0}"
+The default setting is now trace/$roleinstanceid$ which with single instance deployments becomes trace/WorkerRole_IN_0
 
 so for more advanced deployments, a setting like this might be better:
 
