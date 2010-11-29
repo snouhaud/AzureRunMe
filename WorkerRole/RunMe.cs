@@ -357,7 +357,7 @@ namespace WorkerRole
                         if (package != string.Empty)
                         {
                             // Parse out the container\file pair
-                            string[] fields = package.Split(new char[] {'/'}, 2);
+                            string[] fields = package.Split(new char[] {'/','\\'}, 2);
                             InstallPackage(fields[0], fields[1], workingDirectory);
                         }
                     }
