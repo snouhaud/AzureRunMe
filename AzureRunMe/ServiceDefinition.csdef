@@ -4,21 +4,30 @@
     <Endpoints>
 		<!-- See http://www.iana.org/assignments/port-numbers -->
 
-		<InputEndpoint name="telnet" port="23" protocol="tcp"/>
-		<InputEndpoint name="http" port="80" protocol="tcp" />
+		<InputEndpoint name="telnet" port="23" protocol="tcp" localPort="23"/>
+		<InputEndpoint name="http" port="80" protocol="tcp" localPort="80" />
 
-		<InputEndpoint name="http-alt" port="8080" protocol="tcp"/>
+		<InputEndpoint name="http-alt" port="8080" protocol="tcp" localPort="8080"/>
 
-		<InternalEndpoint name="port1" protocol="tcp" />
+		<InternalEndpoint name="port1" protocol="tcp"  />
 		<InternalEndpoint name="port2" protocol="tcp" />
 
     </Endpoints>
     
-	<LocalResources>
-		<LocalStorage name="MyAzureDriveCache"
-				cleanOnRoleRecycle="false"
-				sizeInMB="300" />
-	</LocalResources>
+	  <LocalResources>
+		  <LocalStorage name="MyAzureDriveCache"
+				  cleanOnRoleRecycle="false"
+				  sizeInMB="300" />
+	  </LocalResources>
+
+    <Startup>
+      <Task commandLine="Startup.cmd" executionContext="elevated" taskType="simple">
+        <Environment>
+          <Variable name="AzureRunMe" value="yes"/>
+        </Environment>
+      </Task>
+    </Startup>
+
 
     <ConfigurationSettings>
 		<Setting name="DataConnectionString" />
