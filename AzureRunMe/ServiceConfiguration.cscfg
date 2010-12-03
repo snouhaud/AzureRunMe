@@ -3,25 +3,28 @@
   <Role name="WorkerRole">
     <Instances count="1" />
     <ConfigurationSettings>
-		<Setting name="DataConnectionString" value="DefaultEndpointsProtocol=https;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
-		<Setting name="Packages" value="packages/jre.zip;packages/dist.zip" />
-		<Setting name="WorkingDirectory" value="$roleroot$" />
-		<Setting name="Commands" value="runme.bat" />
-		<Setting name="OnStopCommands" value="" />
-		
-		<Setting name="DefaultConnectionLimit" value="12" />
-
-		<Setting name="DiagnosticsConnectionString" value="DefaultEndpointsProtocol=https;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
-		<Setting name="ScheduledTransferLogLevelFilter" value="Verbose" />
-		<Setting name="ScheduledTransferPeriod" value="1" />
-
-		<Setting name="TraceConnectionString" value="ServicePath=trace/$roleinstanceid$;ServiceNamespace=YOURNAMESPACE;IssuerName=YOURISSUERNAME;IssuerSecret=YOURISSUERSECRET" />
-		<Setting name="LogFormat" value="$computername$: {0:u} {1}" />
-
-		<Setting name="CloudDriveConnectionString" value="DefaultEndpointsProtocol=http;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
-		<Setting name="CloudDrive" value ="drives\$computername$.vhd"/>
-		<Setting name="CloudDriveSize" value="64" />
-		
+      <Setting name="DataConnectionString" value="DefaultEndpointsProtocol=https;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
+      <Setting name="Packages" value="packages/jre.zip;packages/dist.zip" />
+      <Setting name="WorkingDirectory" value="$roleroot$" />
+      <Setting name="Commands" value="runme.bat" />
+      <Setting name="OnStopCommands" value="" />
+      <Setting name="DefaultConnectionLimit" value="12" />
+      <Setting name="DiagnosticsConnectionString" value="DefaultEndpointsProtocol=https;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
+      <Setting name="ScheduledTransferLogLevelFilter" value="Verbose" />
+      <Setting name="ScheduledTransferPeriod" value="1" />
+      <Setting name="TraceConnectionString" value="ServicePath=trace/$roleinstanceid$;ServiceNamespace=YOURNAMESPACE;IssuerName=YOURISSUERNAME;IssuerSecret=YOURISSUERSECRET" />
+      <Setting name="LogFormat" value="$computername$: {0:u} {1}" />
+      <Setting name="CloudDriveConnectionString" value="DefaultEndpointsProtocol=http;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
+      <Setting name="CloudDrive" value="drives\$computername$.vhd" />
+      <Setting name="CloudDriveSize" value="64" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.RemoteAccess.Enabled" value="true" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.RemoteAccess.AccountUsername" value="blackwre" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.RemoteAccess.AccountEncryptedPassword" value="MIIBnQYJKoZIhvcNAQcDoIIBjjCCAYoCAQAxggFOMIIBSgIBADAyMB4xHDAaBgNVBAMME1dpbmRvd3MgQXp1cmUgVG9vbHMCEAhJs2Fn6hOvQlmt1lqbK44wDQYJKoZIhvcNAQEBBQAEggEAEp5d7Rlx+Qk+9aHEdjL40vZlDsb9vw7ASrQIpeNpqdE+f40kpMYnD3gWgUqTSziNrGcuZRSKzJrz0SN3a13bfc4/+MI2tN0IaGceRUD+JfsDApWjC/asBLwaKQ6UaOXLqdWrno85CJj3fX5FeKjxFPhv9uYuCFVWXounf0r+s394u7qv7VXTX0BMvW8qY7FqpaRs+midcSjkSSp8ZmILWZn1HyPBQKbicYfzJlxnHMNDQa64H7v967ufi9Ve8XxXVPJleF6Ebw3HS8V7bM4/U21ncI745pSMTJMAymeub1lNcbXnIjfDHTJOpcpm1zpui8nmD0dK2IaQgDvKce9SvTAzBgkqhkiG9w0BBwEwFAYIKoZIhvcNAwcECCYQ8G9nlNHlgBDSoymUZ0PuRx6XOmHRiuhc" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.RemoteAccess.AccountExpiration" value="2011-01-02T23:59:59.0000000+00:00" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.RemoteForwarder.Enabled" value="true" />
     </ConfigurationSettings>
+    <Certificates>
+      <Certificate name="Microsoft.WindowsAzure.Plugins.RemoteAccess.PasswordEncryption" thumbprint="056E61A0C096E881EF046B1263138BE568379337" thumbprintAlgorithm="sha1" />
+    </Certificates>
   </Role>
 </ServiceConfiguration>
