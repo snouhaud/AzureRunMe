@@ -1,9 +1,9 @@
-AzureRunMe 1.0.0.12
+AzureRunMe 1.0.0.13
 ===================
 
-N.B. The canonical AzureRunMe site is still http://azurerunme.codeplex.com for the time being!
-
 Run your Java, Ruby, Python, Clojure or <insert language of your choice> project on Windows Azure Compute.
+
+Now updated for Windows Azure SDK 1.3
 
 
 Introduction
@@ -19,20 +19,18 @@ I wanted real time tracing of stdio, stderr, debug, log4j etc.
 
 AzureRunMe was born, and to my very great suprise, is now being used by a number of commercial organisations, hobbyists and even Microsoft!
 
-Important Breaking  Changes
----------------------------
+Important Changes
+-----------------
 
 The UploadBlob and DownloadBlob tools have been removed in favour of [AzureCommandLineTools](https://github.com/blackwre/AzureCommandLineTools).
 
-I used to use backslash (\\) to separate package name from blob name in the packages configuration. I now use forward slash (/) for compatability
-with most other Azure literature and tools. Sorry!
+I now use forward slash (/) as the separator between conatiner and blob names.
 
 Example Scenarios
 -----------------
 
-Run one or more simple Java console apps:
+* Run one or more simple Java console apps:
 * One or more CSharp console apps,without any code change
-* A Telnet server in Azure
 * A Tomcat hosted web application
 * A JBOSS hosted app
 * A legacy C / C++ application
@@ -243,9 +241,7 @@ Some useful variables include:
 	%deploymentid%
 	%roleinstanceid%
 
-I have a copy of SED (The Unix Stream editor) packaged in a ZIP, and this allows me to perform simple file based configurations changes:
-
-	sed -e s/8080/%http%/g apache-tomcat\conf\server.xml.orig > apache-tomcat\conf\server.xml
+I have a copy of SED (The Unix Stream editor) packaged in a ZIP, and this allows me to perform simple file based configurations changes.
 
 When I start tomcat, I do it like this rather than using the startup script
 
@@ -284,7 +280,7 @@ Works
 Jetty
 -----
 
-Runs, but not with NIO support.
+Runs, but not with NIO support. NEEDS RETESTING FOR AZURE SDK 1.3
 
 JBOSS
 -----
@@ -294,13 +290,7 @@ Not extensively tested, but a basic system comes up for web serving. Some issues
 ApacheDS LDAP Server
 --------------------
 
-Doesn't work because it uses java.nio
-
-WindowsTelnetDaemon
--------------------
-
-A crazy idea, but a useful stop-gap until we get Remote Desktop into VMs. See http://www.robblackwell.org.uk/2010/09/23/telnet-to-windows-azure.html but
-don't get too excited.
+Doesn't work because it uses java.nio  NEEDS RETESTING FOR AZURE SDK 1.3
 
 ANSI C Code, C++
 ----------------
@@ -354,5 +344,4 @@ See http://www.aws.net/azurelaunchpad or contact info@aws.net if you'd like to h
 
 Rob Blackwell
 
-November 2010
 
