@@ -28,6 +28,7 @@ using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.Diagnostics;
 using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.StorageClient;
+using System.Threading;
 
 
 namespace WorkerRole
@@ -39,6 +40,7 @@ namespace WorkerRole
         DiagnosticMonitorConfiguration config;
         CloudDrive cloudDrive = null;
         string workingDirectory = null;
+        bool isStopping = false;
 
         public RunMe()
         {
@@ -117,13 +119,97 @@ namespace WorkerRole
 
         }
 
+        public void InitialiseTraceConsole(string traceConnectionString)
+        {
+
+            // Start a CloudTraceListener so that we can trace from
+            // a TraceConsole app running on the desktop
+            string servicePath = "";
+            string serviceNamespace = "";
+            string issuerName = "";
+            string issuerSecret = "";
+
+            string[] traceConnectionSettings = traceConnectionString.Split(';');
+            foreach (string traceConnectionSetting in traceConnectionSettings)
+            {
+                string[] setting = traceConnectionSetting.Split(new char[] { '=' }, 2);
+                if (setting[0] == "ServicePath")
+                    servicePath = setting[1];
+                else if (setting[0] == "ServiceNamespace")
+                    serviceNamespace = setting[1];
+                else if (setting[0] == "IssuerName")
+                    issuerName = setting[1];
+                else if (setting[0] == "IssuerSecret")
+                    issuerSecret = setting[1];
+            }
+
+            // Expand keywords in the service path to allow dynamic configuration based on deploymentid, roleinstance id etc
+            servicePath = ExpandKeywords(servicePath);
+
+            // Trace to service bus
+            CloudTraceListener cloudTraceListener = new CloudTraceListener(servicePath, serviceNamespace, issuerName, issuerSecret);
+            Trace.Listeners.Add(cloudTraceListener);
+        }
+
+        private string PackageReceiptFileName(string packageName)
+        {
+            string directory = Environment.GetEnvironmentVariable("RoleRoot");
+            return Path.Combine(directory, packageName + ".receipt");
+        }
+
         /// <summary>
-        /// Download an zip file from blob store and unzip it
+        /// Creates a package receipt (a simple text file in the temp directory) 
+        /// to record the successful download and installation of a package
         /// </summary>
-        /// <param name="containerName">The Blob store container name</param>
-        /// <param name="zipFileName">The name of the zip file</param>
+        private void WritePackageReceipt(string packageName)
+        {
+            string receiptFileName = PackageReceiptFileName(packageName);
+
+            TextWriter textWriter = new StreamWriter(receiptFileName);
+            textWriter.WriteLine(DateTime.Now);
+            textWriter.Close();
+
+            Tracer.WriteLine(string.Format("Writing package receipt {0}", receiptFileName), "Information");
+        }
+
+        /// <summary>
+        /// Checks a package in Blob Storage against any previous package receipt
+        /// to determine whether to reinstall it
+        /// </summary>
+        private bool IsNewPackage(string containerName, string packageName)
+        {
+            CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
+
+            blobClient.RetryPolicy = RetryPolicies.Retry(100, TimeSpan.FromSeconds(1));
+            blobClient.Timeout = TimeSpan.FromSeconds(600);
+
+            CloudBlobContainer container = blobClient.GetContainerReference(containerName);
+            CloudBlockBlob blob = container.GetBlockBlobReference(packageName);
+
+            blob.FetchAttributes();
+            DateTime blobTimeStamp = blob.Attributes.Properties.LastModifiedUtc;
+
+            DateTime fileTimeStamp = File.GetCreationTimeUtc(PackageReceiptFileName(packageName));
+
+            if (fileTimeStamp.CompareTo(blobTimeStamp) < 0)
+            {
+                Tracer.WriteLine(string.Format("{0} is new or not yet installed.", packageName), "Information");
+                return true;
+            }
+            else
+            {
+                Tracer.WriteLine(string.Format("{0} has previously been installed. Skipping download.", packageName), "Information");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Download a package from blob storage and unzip it
+        /// </summary>
+        /// <param name="containerName">The Blob storage container name</param>
+        /// <param name="packageName">The name of the zip file package</param>
         /// <param name="workingDirectory">Where to extract the files</param>
-        private void InstallPackage(string containerName, string zipFileName, string workingDirectory)
+        private void InstallPackage(string containerName, string packageName, string workingDirectory)
         {
            
             CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
@@ -132,14 +218,14 @@ namespace WorkerRole
             blobClient.Timeout = TimeSpan.FromSeconds(600);
 
             CloudBlobContainer container = blobClient.GetContainerReference(containerName);
-            CloudBlockBlob blob = container.GetBlockBlobReference(zipFileName);
+            CloudBlockBlob blob = container.GetBlockBlobReference(packageName);
 
             Tracer.WriteLine(string.Format("Downloading {0} to {1}", blob.Uri, workingDirectory), "Information");
 
             var bytes = blob.DownloadByteArray();
             ZipFile zipFile = ZipFile.Read(bytes);
 
-            Tracer.WriteLine(string.Format("Extracting {0}", zipFileName), "Information");
+            Tracer.WriteLine(string.Format("Extracting {0}", packageName), "Information");
 
             zipFile.ExtractAll(workingDirectory, ExtractExistingFileAction.OverwriteSilently);
 
@@ -165,7 +251,24 @@ namespace WorkerRole
             Tracer.WriteLine("Configuring CloudDrive", "Information");
 
             LocalResource localCache = RoleEnvironment.GetLocalResource("MyAzureDriveCache");
-            CloudDrive.InitializeCache(localCache.RootPath, localCache.MaximumSizeInMegabytes);
+
+            // Temporary workaround for ERROR_UNSUPPORTED_OS seen with Windows Azure Drives
+            // See http://blogs.msdn.com/b/windowsazurestorage/archive/2010/12/17/error-unsupported-os-seen-with-windows-azure-drives.aspx
+            for (int i = 0; i < 30; i++)
+            {
+                   try
+                   {
+                       CloudDrive.InitializeCache(localCache.RootPath, localCache.MaximumSizeInMegabytes);
+                       break;                   
+                   }
+                   catch (CloudDriveException ex)
+                   {
+                       if (!ex.Message.Equals("ERROR_UNSUPPORTED_OS") || i == 29)
+                             throw;
+                       Tracer.WriteLine("Using temporary workaround for ERROR_UNSUPPORTED_OS see http://bit.ly/fw7qzo", "Information");
+                       Thread.Sleep(10000);
+                   }
+            }            
 
             CloudBlobClient blobClient = cloudDriveStorageAccount.CreateCloudBlobClient();
             blobClient.GetContainerReference(container).CreateIfNotExist();
@@ -264,7 +367,6 @@ namespace WorkerRole
             return process;
         }
 
-
         public bool OnStart()
         {
             config = DiagnosticMonitor.GetDefaultInitialConfiguration();
@@ -282,34 +384,10 @@ namespace WorkerRole
             // Set the maximum number of concurrent outbound connections 
             ServicePointManager.DefaultConnectionLimit = int.Parse(RoleEnvironment.GetConfigurationSettingValue("DefaultConnectionLimit"));
 
-            // Retrieve the AppFabric Service Bus credentials and
-            // Start a CloudTraceListener so that we can trace from
-            // a TraceConsole app running on the desktop
-            string servicePath = "";
-            string serviceNamespace = "";
-            string issuerName = "";
-            string issuerSecret = "";
-
-            string[] traceConnectionSettings = RoleEnvironment.GetConfigurationSettingValue("TraceConnectionString").Split(';');
-            foreach (string traceConnectionSetting in traceConnectionSettings)
-            {
-                string[] setting = traceConnectionSetting.Split(new char[] { '=' }, 2);
-                if (setting[0] == "ServicePath")
-                    servicePath = setting[1];
-                if (setting[0] == "ServiceNamespace")
-                    serviceNamespace = setting[1];
-                if (setting[0] == "IssuerName")
-                    issuerName = setting[1];
-                if (setting[0] == "IssuerSecret")
-                    issuerSecret = setting[1];
-            }
-
-            // Expand keywords in the service path to allow dynamic configuration based on deploymentid, roleinstance id etc
-            servicePath = ExpandKeywords(servicePath);
-
-            // Trace to service bus
-            CloudTraceListener cloudTraceListener = new CloudTraceListener(servicePath, serviceNamespace, issuerName, issuerSecret);
-            Trace.Listeners.Add(cloudTraceListener);
+            // If a TraceConnectionString is specified then start a TraceConsole via the AppFabric Service Bus
+            string traceConnectionString = RoleEnvironment.GetConfigurationSettingValue("TraceConnectionString");
+            if (!String.IsNullOrEmpty(traceConnectionString))
+                InitialiseTraceConsole(traceConnectionString);
 
             // Trace to Azure Diagnostics (table storage).
             DiagnosticMonitorTraceListener diagnosticMonitorTraceListener = new DiagnosticMonitorTraceListener();
@@ -323,7 +401,7 @@ namespace WorkerRole
         public void Run()
         {
             Tracer.WriteLine(string.Format("AzureRunMe {0}", Version()), "Information");
-            Tracer.WriteLine("Copyright (c) 2010 Active Web Solutions Ltd [www.aws.net]", "Information");
+            Tracer.WriteLine("Copyright (c) 2010 - 2011 Active Web Solutions Ltd [www.aws.net]", "Information");
             Tracer.WriteLine("", "Information");
 
             Tracer.WriteLine(string.Format("DeploymentId: {0}", RoleEnvironment.DeploymentId), "Information");
@@ -348,6 +426,9 @@ namespace WorkerRole
                 workingDirectory = RoleEnvironment.GetConfigurationSettingValue("WorkingDirectory");
                 workingDirectory = ExpandKeywords(workingDirectory);
 
+                bool alwaysInstallPackages = bool.Parse(RoleEnvironment.GetConfigurationSettingValue("AlwaysInstallPackages"));
+                Tracer.WriteLine(string.Format("AlwaysInstallPackages: {0}", alwaysInstallPackages), "Information");
+
                 // Retrieve the semicolon delimitted list of zip file packages and install them
                 string[] packages = RoleEnvironment.GetConfigurationSettingValue("Packages").Split(';');
                 foreach (string package in packages)
@@ -358,7 +439,15 @@ namespace WorkerRole
                         {
                             // Parse out the container\file pair
                             string[] fields = package.Split(new char[] {'/','\\'}, 2);
-                            InstallPackage(fields[0], fields[1], workingDirectory);
+
+                            string containerName = fields[0];
+                            string packageName = fields[1];
+
+                            if (alwaysInstallPackages || IsNewPackage(containerName, packageName))
+                            {
+                                InstallPackage(containerName, packageName, workingDirectory);
+                                WritePackageReceipt(packageName);
+                            }
                         }
                     }
                     catch (Exception e)
@@ -370,6 +459,18 @@ namespace WorkerRole
                 string commands = RoleEnvironment.GetConfigurationSettingValue("Commands");
                 RunCommands(commands);
 
+                // If DontExit is set, then keep runing even though all the Commands have finished
+                // (Useful if you want to RDP in afterwards). 
+                bool dontExit = bool.Parse(RoleEnvironment.GetConfigurationSettingValue("DontExit"));
+
+                Tracer.WriteLine(string.Format("DontExit: {0}", dontExit), "Information");
+
+                if (dontExit)
+                    while (!isStopping)
+                        Thread.Sleep(1000);
+
+                Tracer.WriteLine("Run method exiting", "Information");
+
             }
             catch (Exception e)
             {
@@ -379,6 +480,8 @@ namespace WorkerRole
 
         public void OnStop()
         {
+            isStopping = true;
+
             string commands = RoleEnvironment.GetConfigurationSettingValue("OnStopCommands");
             RunCommands(commands);
 

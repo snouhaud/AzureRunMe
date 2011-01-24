@@ -1,40 +1,44 @@
-AzureRunMe 1.0.0.13
+AzureRunMe 1.0.0.14
 ===================
 
-Run your Java, Ruby, Python, Clojure or <insert language of your choice> project on Windows Azure Compute.
+Probably the quickest way to get your legacy or third-party code running on Windows Azure.
 
-Now updated for Windows Azure SDK 1.3
-
+N.B. AzureRunMe has moved to https://github.com/blackwre/AzureRunMe
 
 Introduction
 ------------
 
-There are a number of code samples that show how to run Java, Ruby, Python etc on Windows Azure, but they all vary in approach and complexity. I thought there ought to be a simplified, standardised way.
+AzureRunMe is a boostrap program that essentially provides an off-the-shelf CSPKG file that you can upload to Azure and run.
 
-I wanted something simple that took a self contained ZIP file, unpacked it and just executed a batch file. All the role information like ipaddress and port could be passed as environment variables %IPAddress% or %Http% etc.
+From there you can remote desktop to your instance, upload you code via ZIP files in Blob Store and kick off your processes in a repeatable way, just by changing configuration.
+
+If you are using Java, Clojure, C++ or other languages this might be the quickest way to get your code running in Azure without having to worry about building any .NET code.
+
+Background
+----------
+
+There are a number of code samples that show how to run Java, Ruby, Python etc on Windows Azure, but they all vary in approach and complexity. 
+Everyone seems to write their own boostrap program. I thought there ought to be a simplified, standardised way.
+
+I wanted something simple that took a self contained ZIP file, unpacked it and just executed a batch file. 
+All the role information like ipaddress and port could be passed as environment variables %IPAddress% or %Http% etc.
 
 I wanted ZIP files to be stored in Blob store to allow them to be easily updated with all Configuration settings in the Azure Service Configuration.
 
 I wanted real time tracing of stdio, stderr, debug, log4j etc.
 
-AzureRunMe was born, and to my very great suprise, is now being used by a number of commercial organisations, hobbyists and even Microsoft!
-
-Important Changes
------------------
-
-The UploadBlob and DownloadBlob tools have been removed in favour of [AzureCommandLineTools](https://github.com/blackwre/AzureCommandLineTools).
-
-I now use forward slash (/) as the separator between conatiner and blob names.
+AzureRunMe was born, and to my very great suprise, is now being used by a number of commercial organisations, hobbyists and even Microsoft people!
 
 Example Scenarios
 -----------------
 
-* Run one or more simple Java console apps:
+Run one or more simple Java console apps:
 * One or more CSharp console apps,without any code change
 * A Tomcat hosted web application
 * A JBOSS hosted app
 * A legacy C / C++ application
 * A Clojure / Compojure app
+* A Common Lisp app
 * A Ruby on Rails web app
 * Use PortBridgeAgent to proxy some ports from an intranet server e.g. LDAP.
 * Use PortBridge to proxy internal endpoints back to on premises e.g. JPDA to your Eclipse debugger
@@ -154,6 +158,13 @@ If you want to start multiple processes, you can specify them in a semicolon sep
 
 	<Setting name="Commands" value="portbridge.exe;tomcat.bat"/>
 
+If you leave Commands blank and set DontExit, like this
+	
+	<Setting name="Commands" value=""/>
+	<Setting name="DontExit" value="True" />
+
+Then the instance boots up without running any code, but you can still remote desktop in and start playing.
+
 Optionally you can run some commands when the instance is stopped (i.e. via the OnStop method)
 
 	<Setting name="OnStopCommands" value="cleanup.bat"/>
@@ -221,12 +232,32 @@ CloudDriveSize is specified in megabytes.
 
 At run time, the cloud drive location is available through the %clouddrive% environment variable.
 
+DontExit
+--------
+
+If DontExit is set to True then the WorkerRole's Run Method wont exit until the WorkerRole is explicitly stopped using OnStop.
+If DontExit is set to False then the WorkerRole's Run Method will exit as soon as any processes created from the "Commands" section have exited.
+
+	<Setting name="DontExit" value="True" />
+
+
+AlwaysInstallPackages
+---------------------
+
+AlwaysInstallPackages True ensures that packages are always downloaded and extracted from Blob Storage even if they have previously been installed 
+(This is the default and backwards compatible behaviour). 
+
+	<Setting name="AlwaysInstallPackages" value="True" />
+
+Setting AlwaysInstall to False can optimise the time it takes to restart an instance, by only reinstalling packages that have been updated in Blob Store.
+
+
 Batch file tricks
 -----------------
 
-Its common to kick off your processes from a batch file and its idoimatic to call it runme.bat
+It's common to kick off your processes from a batch file and its idoimatic to call it runme.bat
 
-It can contain all the old-fashioned DOS like commands echo etc.
+It can contain all the old-fashioned DOS-like commands echo etc.
 
 I often use
 
@@ -241,25 +272,28 @@ Some useful variables include:
 	%deploymentid%
 	%roleinstanceid%
 
-I have a copy of SED (The Unix Stream editor) packaged in a ZIP, and this allows me to perform simple file based configurations changes.
+I have a copy of SED (The Unix Stream editor) packaged in a ZIP, and this allows me to perform simple file based configurations changes:
+
+	sed -e s/8080/%http%/g apache-tomcat\conf\server.xml.orig > apache-tomcat\conf\server.xml
 
 When I start tomcat, I do it like this rather than using the startup script
 
 	apache-tomcat\bin\catalina.bat run
 
-Whilst the CMD shell doesnt really have job control, you can start background processes with the START command.
+Whilst the CMD shell doesnt really have proper job control, you can start background processes with the START command.
 
 Issues
 ------
 
 There are a number of Java apps that use the java.nio library to try to establish non blocking IO connections to the loopback adapter. This isnt allowed by the Windows Azure security policy.
-If you are working with Java, you might like to read http://www.robblackwell.org.uk/2010/11/06/java-on-windows-azure-roundup.html
+If you are working with Java, you might like to read http://www.robblackwell.org.uk/2010/11/06/java-on-windows-azure-roundup.html  NEEDS RETESTING AND REVALIDATING
 
 For compatability issues with specific applications, see below.
 
-Unfortunately we cant configure more that 5 end points on the Load balancer, so you may need to recompile with your own CSDEF file. The vmsize attribute is also baked into this file.
+Unfortunately we cant configure more that 5 end points on the Load balancer, so you may need to recompile with your own CSDEF file to fiddle with ports.
+The vmsize attribute is unfortunately, also baked into this file.
 
-There is still some occasional wierd problems with some DLL files which won't unzip to the approot.
+There are still some occasional wierd problems with some DLL files which won't unzip to the approot.
 
 Clojure + Compojure
 -------------------
@@ -270,7 +304,6 @@ Tomcat
 ------
 
 Works.
-Contact me if you want to know how, but it's much neater than the TomCat Solution Accelerator because your WAR files can just come from Blob Store!
 
 Restlet 
 -------
@@ -280,35 +313,34 @@ Works
 Jetty
 -----
 
-Runs, but not with NIO support. NEEDS RETESTING FOR AZURE SDK 1.3
+Runs, but not with NIO support. NEEDS RETESTING AND REVALIDATING
 
 JBOSS
 -----
 
-Not extensively tested, but a basic system comes up for web serving. Some issues I belive with JCA etc because it uses java.nio.
+Not extensively tested, but a basic system comes up for web serving. Some issues I belive with JCA etc because it uses java.nio. NEEDS RETESTING AND REVALIDATING
 
 ApacheDS LDAP Server
 --------------------
 
-Doesn't work because it uses java.nio  NEEDS RETESTING FOR AZURE SDK 1.3
+Doesn't work because it uses java.nio NEEDS RETESTING AND REVALIDATING
 
 ANSI C Code, C++
 ----------------
 
-With the appropriate Visual C++ runtime and libraries this is known to work.
+With the appropriate Visual C++ runtime and libraries this is known to work.  You may need to install your VC++ runtime via Startup.cmd for legacy runtime redistributables.
 
 ADPlus Debugging tools
 ----------------------
 
 Need a crash dump? See http://www.robblackwell.org.uk/2010/10/27/advanced-debugging-on-windows-azure-with-adplus.html
 
-PSTools
--------
+SysInternals PSTools
+--------------------
 
-I hear that some of the the SysInternals PSTools http://technet.microsoft.com/en-us/sysinternals/bb896649.aspx run under WindowsTelnetDaemon on
-AzureRunMe, providing a way to list and kill processes. Thanks to Jsun for this one!
+Works.
 
-The trick is to use the /accepteula flag!
+The trick is to use the /accepteula flag! Thanks to Jsun for this one!
 
 AzureCommandLineTools
 ---------------------
@@ -328,12 +360,17 @@ That old swiss army knife 7 Zip http://www.7-zip.org/, works too. Thanks to Jsun
 
 	> 7zip x myfile.zip
 
+
 Credits
 -------
 
 This project uses Ionic Zip library, part of a CodePlex project at http://www.codeplex.com/DotNetZip which is distributed under the terms of the Microsoft Public License.
 
 TraceConsole and TraceListener are code samples from the Microsoft appFabric SDK (with minor modifications).
+
+Thanks to Jsun for lots of constructive ideas and testing to near destruction!
+
+Thanks to Steve Marx for inspirational code samples and workarounds.
 
 Commercial Support
 ------------------
@@ -344,4 +381,5 @@ See http://www.aws.net/azurelaunchpad or contact info@aws.net if you'd like to h
 
 Rob Blackwell
 
+January 2011
 

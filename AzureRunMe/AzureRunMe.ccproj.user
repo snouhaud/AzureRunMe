@@ -3,5 +3,15 @@
   <PropertyGroup>
     <DeploymentBuildOnly>True</DeploymentBuildOnly>
     <DeploymentIsExpanded>True</DeploymentIsExpanded>
+    <DeploymentAccountName>RobBlackwell</DeploymentAccountName>
+    <DeploymentHostedService>azurerunme</DeploymentHostedService>
+    <DeploymentHostedServiceLabel>AzureRunMe</DeploymentHostedServiceLabel>
+    <DeploymentSlot>Production</DeploymentSlot>
+    <DeploymentIncludeIntellitrace>False</DeploymentIncludeIntellitrace>
+    <DeploymentEnableWebDeploy>False</DeploymentEnableWebDeploy>
+    <DeploymentStorageService>robblackwell</DeploymentStorageService>
+    <DeploymentStorageServiceLabel>robblackwell</DeploymentStorageServiceLabel>
+    <DeploymentLabel>AzureRunMe - 02/12/2010 14:11:10</DeploymentLabel>
+    <DeploymentPromptBeforeDeleting>True</DeploymentPromptBeforeDeleting>
   </PropertyGroup>
 </Project>
