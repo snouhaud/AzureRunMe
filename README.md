@@ -1,4 +1,4 @@
-AzureRunMe 1.0.0.14
+AzureRunMe 1.0.0.15
 ===================
 
 Probably the quickest way to get your legacy or third-party code running on Windows Azure.
@@ -8,9 +8,11 @@ N.B. AzureRunMe has moved to https://github.com/blackwre/AzureRunMe
 Introduction
 ------------
 
-AzureRunMe is a boostrap program that essentially provides an off-the-shelf CSPKG file that you can upload to Azure and run.
+AzureRunMe is a boostrap program that provides an off-the-shelf CSPKG file that you can upload to Windows Azure Conpute and run.
 
-From there you can remote desktop to your instance, upload you code via ZIP files in Blob Store and kick off your processes in a repeatable way, just by changing configuration.
+From there you can upload you code via ZIP files in Blob Store and kick off your processes in a repeatable way, just by changing configuration.
+
+AzureRunMe preconfigures Remote Desktop access, making it easy to debug and diagnose problems.
 
 If you are using Java, Clojure, C++ or other languages this might be the quickest way to get your code running in Azure without having to worry about building any .NET code.
 
@@ -27,7 +29,7 @@ I wanted ZIP files to be stored in Blob store to allow them to be easily updated
 
 I wanted real time tracing of stdio, stderr, debug, log4j etc.
 
-AzureRunMe was born, and to my very great suprise, is now being used by a number of commercial organisations, hobbyists and even Microsoft people!
+AzureRunMe was born, and to my very great suprise, is now being used by a number of commercial organisations, hobbyists and even Microsoft themselves!
 
 Example Scenarios
 -----------------
@@ -89,6 +91,8 @@ Click on AzureRunMe and Publish your Azure package. Sign into the [Windows Azure
 Create a New Hosted Service and upload the package and config to your Windows Azure account. You are nearly ready to go.
 
 Change the app.config file for TraceConsole to include your own service bus credentials.
+
+Right Click, Publish, Configure Remote Desktop Connection.
 
 Run the TraceConsole locally on your desktop machine. Now run the Azure instance by clicking on Run in the Windows Azure Developer Portal.
 
@@ -176,14 +180,10 @@ The default connection limit specifies the number of outbound TCP connections.If
 
 		<Setting name="DefaultConnectionLimit" value ="12"/>
 
-Advanced Tracing
-----------------
+Configuration Keyword Expansions
+--------------------------------
 
-With a fixed service path of trace/azurerunme, all service bus based tracing from all instances goes to the same TraceConsole.
-
-With multiple instances or multiple deployments that can be confusing - it's hard to see which instance wrote which message when they are interleaved.
-
-For that reason, the service path is configurable with some keyword expansions:
+Several of the configuration file settings support expansion of these variables
 
 * $deploymentid$ expands to the deployment id - something like 3bdbf69e94c645f1ab19f2e428eb05fe
 * $roleinstanceid$ expands to the role instance id - something like {"WorkerRole_IN_0"}
@@ -192,6 +192,16 @@ For that reason, the service path is configurable with some keyword expansions:
 * $now$ expands to DateTime.Now (the current time).
 * $roleroot$" expands to the role root directory
 * $clouddrive$" expands to the directory where the clouddrive is mounted
+* $approot$ expands to $roleroot$\approot
+
+Advanced Tracing
+----------------
+
+With a fixed service path of trace/azurerunme, all service bus based tracing from all instances goes to the same TraceConsole.
+
+With multiple instances or multiple deployments that can be confusing - it's hard to see which instance wrote which message when they are interleaved.
+
+For that reason, the service path is configurable with keyword expansions (See above).
 
 The default setting is now trace/$roleinstanceid$ which with single instance deployments becomes trace/WorkerRole_IN_0
 
@@ -274,8 +284,6 @@ Some useful variables include:
 
 I have a copy of SED (The Unix Stream editor) packaged in a ZIP, and this allows me to perform simple file based configurations changes:
 
-	sed -e s/8080/%http%/g apache-tomcat\conf\server.xml.orig > apache-tomcat\conf\server.xml
-
 When I start tomcat, I do it like this rather than using the startup script
 
 	apache-tomcat\bin\catalina.bat run
@@ -292,8 +300,6 @@ For compatability issues with specific applications, see below.
 
 Unfortunately we cant configure more that 5 end points on the Load balancer, so you may need to recompile with your own CSDEF file to fiddle with ports.
 The vmsize attribute is unfortunately, also baked into this file.
-
-There are still some occasional wierd problems with some DLL files which won't unzip to the approot.
 
 Clojure + Compojure
 -------------------
@@ -346,9 +352,6 @@ AzureCommandLineTools
 ---------------------
 
 UploadBlob adnd DownloadBlob have been replaced with a more comprehensive set of command line tools, see https://github.com/blackwre/AzureCommandLineTools.
-
-I suggest that you ZIP these tools up and deploy them with the WindowsTelnetDaemon https://github.com/blackwre/WindowsTelnetDaemon to make it easy
-to copy files on or off your running instance.
 
 	> PutBlob myfilename mycontainer/myblob
 	> GetBlob mycontainer/myblob

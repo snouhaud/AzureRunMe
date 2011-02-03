@@ -63,6 +63,7 @@ namespace WorkerRole
         /// </summary>
         private string ExpandKeywords(string buffer)
         {
+            buffer = buffer.Replace("$approot$", "$roleroot$\approot");
             buffer = buffer.Replace("$deploymentid$", RoleEnvironment.DeploymentId);
             buffer = buffer.Replace("$roleinstanceid$", RoleEnvironment.CurrentRoleInstance.Id);
             buffer = buffer.Replace("$computername$", Environment.MachineName);
