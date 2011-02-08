@@ -45,6 +45,25 @@ Run one or more simple Java console apps:
 * Use PortBridgeAgent to proxy some ports from an intranet server e.g. LDAP.
 * Use PortBridge to proxy internal endpoints back to on premises e.g. JPDA to your Eclipse debugger
 
+Fast Start
+----------
+
+There are three files in the dist directory
+
+AzureRunMe.cspkg - The package file, ready to upload and use
+ServiceConfiguration.cscfg - The configuration file - you'll need to edit this with your various credentials
+AzureRunMeRDP.pfx - A sample certificate that you can use for RDP **
+
+Upload the certificate (password is tiger123!)
+
+You can remote desktop by clicking on teh RDP link in the portal - 
+
+user: scott
+password: tiger123!
+
+** NB This certificate is provided for quickstart /demo only - you should use your own for any serious, or
+production work!! You should also change the RDP password ASAP.
+
 Getting Started
 ---------------
 
