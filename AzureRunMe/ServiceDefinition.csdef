@@ -23,6 +23,7 @@
       <Setting name="Packages" />
       <Setting name="AlwaysInstallPackages" />
       <Setting name="WorkingDirectory" />
+      <Setting name="EnvironmentVariables" />
       <Setting name="Commands" />
       <Setting name="OnStopCommands" />
       <Setting name="DontExit" />

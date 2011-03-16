@@ -7,6 +7,7 @@
       <Setting name="Packages" value="packages/jre.zip;packages/dist.zip" />
       <Setting name="AlwaysInstallPackages" value="true" />
       <Setting name="WorkingDirectory" value="$roleroot$" />
+      <Setting name="EnvironmentVariables" value="azurerunme=true;pi=3.14" />
       <Setting name="Commands" value="runme.bat" />
       <Setting name="OnStopCommands" value="" />
       <Setting name="DontExit" value="true" />

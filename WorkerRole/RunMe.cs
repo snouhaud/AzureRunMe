@@ -40,6 +40,7 @@ namespace WorkerRole
         DiagnosticMonitorConfiguration config;
         CloudDrive cloudDrive = null;
         string workingDirectory = null;
+        string environmentVariables = null;
         bool isStopping = false;
 
         public RunMe()
@@ -253,9 +254,11 @@ namespace WorkerRole
 
             LocalResource localCache = RoleEnvironment.GetLocalResource("MyAzureDriveCache");
 
+            const int TRIES = 30;
+
             // Temporary workaround for ERROR_UNSUPPORTED_OS seen with Windows Azure Drives
             // See http://blogs.msdn.com/b/windowsazurestorage/archive/2010/12/17/error-unsupported-os-seen-with-windows-azure-drives.aspx
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < TRIES; i++)
             {
                    try
                    {
@@ -264,8 +267,18 @@ namespace WorkerRole
                    }
                    catch (CloudDriveException ex)
                    {
-                       if (!ex.Message.Equals("ERROR_UNSUPPORTED_OS") || i == 29)
-                             throw;
+                       if (!ex.Message.Equals("ERROR_UNSUPPORTED_OS"))
+                       {
+                           throw;
+                       }
+
+                       if (i >= (TRIES - 1))
+                       {
+                           // If the workaround fails then it would be dangerous to continue silently, so exit 
+                           Tracer.WriteLine("Workaround for ERROR_UNSUPPORTED_OS see http://bit.ly/fw7qzo FAILED", "Error");
+                           System.Environment.Exit(-1);
+                       }
+
                        Tracer.WriteLine("Using temporary workaround for ERROR_UNSUPPORTED_OS see http://bit.ly/fw7qzo", "Information");
                        Thread.Sleep(10000);
                    }
@@ -305,7 +318,7 @@ namespace WorkerRole
         /// </summary>
         /// <param name="workingDirectory">Directory on disk</param>
         /// <param name="script">Batch file name (e.g. runme.bat)</param>
-        private  Process Run(string workingDirectory, string batchFile)
+        private Process Run(string workingDirectory, string environmentVariables, string batchFile)
         {
             const string IP_ADDRESS = "ipaddress";
             const string DEPLOYMENT_ID = "deploymentid";
@@ -325,6 +338,9 @@ namespace WorkerRole
                 CreateNoWindow = true,
                 WorkingDirectory = workingDirectory
             };
+
+            
+            EnvironmentVariables(startInfo, environmentVariables);
 
             // Set an environment variable for each InstanceEndPoint
             foreach (var endpoint in RoleEnvironment.CurrentRoleInstance.InstanceEndpoints)
@@ -427,6 +443,8 @@ namespace WorkerRole
                 workingDirectory = RoleEnvironment.GetConfigurationSettingValue("WorkingDirectory");
                 workingDirectory = ExpandKeywords(workingDirectory);
 
+                environmentVariables = RoleEnvironment.GetConfigurationSettingValue("EnvironmentVariables");
+
                 bool alwaysInstallPackages = bool.Parse(RoleEnvironment.GetConfigurationSettingValue("AlwaysInstallPackages"));
                 Tracer.WriteLine(string.Format("AlwaysInstallPackages: {0}", alwaysInstallPackages), "Information");
 
@@ -493,6 +511,19 @@ namespace WorkerRole
             }
         }
 
+        private void EnvironmentVariables(ProcessStartInfo processStartInfo, string environmentVariables)
+        {
+            string[] assignments = environmentVariables.Split(';');
+
+            foreach (string assignment in assignments)
+            {
+                if (!String.IsNullOrEmpty(assignment)) {
+                    string[] parts = assignment.Split('=');
+                    SetEnvironmentVariable(processStartInfo, parts[0].Trim(), parts[1].Trim());
+                }
+            }
+        }
+
         private void RunCommands(string commandList)
         {
             // Spawn new a new process for each command
@@ -504,7 +535,7 @@ namespace WorkerRole
                 {
                     if (command != string.Empty)
                     {
-                        Process process = Run(workingDirectory, command);
+                        Process process = Run(workingDirectory, environmentVariables, command);
                         processes.Add(process);
                     }
                 }
