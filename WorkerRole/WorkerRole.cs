@@ -27,31 +27,22 @@ namespace WorkerRole
 {
     public class WorkerRole : RoleEntryPoint
     {
-
         RunMe runMe = new RunMe();
 
         public override void Run()
         {
-            Tracer.WriteLine("WorkerRole entry point called", "Information");
-            Log.WriteEntry("WorkerRole.Run() called");
             runMe.Run();
-            Tracer.WriteLine("WorkerRole exit", "Critical");
         }
 
         public override bool OnStart()
         {
-            Log.WriteEntry("WorkerRole.OnStart() called");
             runMe.OnStart();
-
             return base.OnStart();
         }
 
         public override void OnStop()
         {
-            Tracer.WriteLine("OnStop", "Critical");
-            Log.WriteEntry("WorkerRole.OnStop() called");
             runMe.OnStop();
-
             base.OnStop();
         }
    

@@ -42,11 +42,14 @@ namespace WorkerRole
         string workingDirectory = null;
         string environmentVariables = null;
         bool isStopping = false;
+        Log log;
 
         public RunMe()
         {
             storageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue("DataConnectionString"));
-            cloudDriveStorageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue("CloudDriveConnectionString")); 
+            cloudDriveStorageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue("CloudDriveConnectionString"));
+
+            log = new Log(RoleEnvironment.GetConfigurationSettingValue("LogConnectionString"));
         
         }
 
@@ -389,6 +392,8 @@ namespace WorkerRole
 
         public bool OnStart()
         {
+            log.WriteEntry("OnStart");
+
             config = DiagnosticMonitor.GetDefaultInitialConfiguration();
 
             Configure();
@@ -420,6 +425,9 @@ namespace WorkerRole
 
         public void Run()
         {
+            Tracer.WriteLine("WorkerRole entry point called", "Information");
+            log.WriteEntry("Run");
+
             Tracer.WriteLine(string.Format("AzureRunMe {0}", Version()), "Information");
             Tracer.WriteLine("Copyright (c) 2010 - 2011 Active Web Solutions Ltd [www.aws.net]", "Information");
             Tracer.WriteLine("", "Information");
@@ -502,10 +510,15 @@ namespace WorkerRole
             {
                 Tracer.WriteLine(e, "Error");
             }
+
+            Tracer.WriteLine("WorkerRole exit", "Critical");
         }
 
         public void OnStop()
         {
+            Tracer.WriteLine("OnStop", "Critical");
+            log.WriteEntry("OnStop");
+
             isStopping = true;
 
             string commands = RoleEnvironment.GetConfigurationSettingValue("OnStopCommands");
@@ -564,6 +577,7 @@ namespace WorkerRole
         private void RoleEnvironmentChanging(object sender, RoleEnvironmentChangingEventArgs e)
         {
             Tracer.WriteLine("RoleEnvironmentChanging", "Information");
+            log.WriteEntry("RoleEnvironmentChanging");
 
             // These configuration changes don't require a restart
             string[] exemptConfigurationItems =
@@ -588,6 +602,7 @@ namespace WorkerRole
         private void RoleEnvironmentChanged(object sender, RoleEnvironmentChangedEventArgs e)
         {
             Tracer.WriteLine("RoleEnvironmentChanged", "Information");
+            log.WriteEntry("RoleEnvironmentChanged");
             Configure();
         }
     }

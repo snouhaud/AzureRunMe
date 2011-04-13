@@ -22,44 +22,24 @@ using Microsoft.WindowsAzure.StorageClient;
 
 namespace WorkerRole
 {
-
-    public static class Log
+    public class Log
     {
-        static readonly string LOG_TABLE_NAME = "AzureRunMeLog";
-        static object semaphore = new object();
-        static bool initialized = false;
+        const string LOG_TABLE_NAME = "AzureRunMeLog";
+        CloudTableClient cloudTableClient;
 
-        public static void Initialize()
+        public Log(string connectionString)
         {
-            Tracer.WriteLine("Log.Initialize() called", "Information");
-
-            try
-            {
-                var account = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue("LogConnectionString"));
-                var dataContext = account.CreateCloudTableClient().GetDataServiceContext();
-
-                account.CreateCloudTableClient().CreateTableIfNotExist(LOG_TABLE_NAME);
-
-                lock (semaphore)
-                    initialized = true;
-            }
-            catch (Exception e)
-            {
-                Tracer.WriteLine(e.ToString(), "Critical");
-            }
-
+            CloudStorageAccount account = CloudStorageAccount.Parse(connectionString);
+            cloudTableClient = account.CreateCloudTableClient();
         }
 
-        public static void WriteEntry(string message)
+        public void WriteEntry(string message)
         {
-            if (initialized == false)
-                Initialize();
-
             try
             {
-                var account = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue("LogConnectionString"));
-                var dataContext = account.CreateCloudTableClient().GetDataServiceContext();
-
+                cloudTableClient.CreateTableIfNotExist(LOG_TABLE_NAME);
+                
+                TableServiceContext dataContext = cloudTableClient.GetDataServiceContext();
                 dataContext.AddObject(LOG_TABLE_NAME, new LogEntry(message));
                 dataContext.SaveChangesWithRetries();
             }
@@ -68,8 +48,5 @@ namespace WorkerRole
                 Tracer.WriteLine(e.ToString(), "Critical");
             }
         }
-
-
-
     }
 }
