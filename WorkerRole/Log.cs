@@ -17,7 +17,6 @@
 
 using System;
 using Microsoft.WindowsAzure;
-using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.StorageClient;
 
 namespace WorkerRole
@@ -33,14 +32,14 @@ namespace WorkerRole
             cloudTableClient = account.CreateCloudTableClient();
         }
 
-        public void WriteEntry(string message)
+        public void WriteEntry(string eventName, string details)
         {
             try
             {
                 cloudTableClient.CreateTableIfNotExist(LOG_TABLE_NAME);
                 
                 TableServiceContext dataContext = cloudTableClient.GetDataServiceContext();
-                dataContext.AddObject(LOG_TABLE_NAME, new LogEntry(message));
+                dataContext.AddObject(LOG_TABLE_NAME, new LogEntry(eventName, details));
                 dataContext.SaveChangesWithRetries();
             }
             catch (Exception e)

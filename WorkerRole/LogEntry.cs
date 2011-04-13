@@ -16,28 +16,32 @@
 #endregion
 
 using System;
-using Microsoft.WindowsAzure.StorageClient;
 using Microsoft.WindowsAzure.ServiceRuntime;
+using Microsoft.WindowsAzure.StorageClient;
 
 public class LogEntry : TableServiceEntity
 {
     public LogEntry()
     { }
 
-    public LogEntry(string message)
+    public LogEntry(string eventName, string details)
     {
         DateTime createdUtc = DateTime.UtcNow;
 
-        // Separate partition key for each day
-        this.PartitionKey = (DateTime.MaxValue - createdUtc.Date).Ticks.ToString("d19");
+        // Keep all entries for one machine together
+        this.PartitionKey = Environment.MachineName;
+
+        // Use reverse time so that entries are sorted chronologically with latest entries appearing first
         this.RowKey = String.Format("{0}_{1}", (DateTime.MaxValue - createdUtc).Ticks.ToString("d19"), Guid.NewGuid().ToString());
+
         this.Timestamp = createdUtc;
-        this.ComputerName = Environment.MachineName;
         this.InstanceId = RoleEnvironment.CurrentRoleInstance.Id;
-        this.Message = message;
+        this.EventName = eventName;
+        this.Details = details;
+        
     }
 
-    public string ComputerName { get; set; }
     public string InstanceId { get; set; }
-    public string Message { get; set; }
+    public string EventName { get; set; }
+    public string Details { get; set; }
 }

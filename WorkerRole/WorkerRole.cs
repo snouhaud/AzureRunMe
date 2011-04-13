@@ -15,12 +15,6 @@
 //
 #endregion
 
-using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Net;
-using Microsoft.ServiceBus.Samples;
-using Microsoft.WindowsAzure.Diagnostics;
 using Microsoft.WindowsAzure.ServiceRuntime;
 
 namespace WorkerRole

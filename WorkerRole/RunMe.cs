@@ -22,12 +22,12 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 using Microsoft.ServiceBus.Samples;
 using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.Diagnostics;
 using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.StorageClient;
-using System.Threading;
 using SevenZip;
 
 
@@ -392,7 +392,7 @@ namespace WorkerRole
 
         public bool OnStart()
         {
-            log.WriteEntry("OnStart");
+            log.WriteEntry("OnStart", "OnStart");
 
             config = DiagnosticMonitor.GetDefaultInitialConfiguration();
 
@@ -426,7 +426,7 @@ namespace WorkerRole
         public void Run()
         {
             Tracer.WriteLine("WorkerRole entry point called", "Information");
-            log.WriteEntry("Run");
+            log.WriteEntry("Run", "Run");
 
             Tracer.WriteLine(string.Format("AzureRunMe {0}", Version()), "Information");
             Tracer.WriteLine("Copyright (c) 2010 - 2011 Active Web Solutions Ltd [www.aws.net]", "Information");
@@ -517,7 +517,7 @@ namespace WorkerRole
         public void OnStop()
         {
             Tracer.WriteLine("OnStop", "Critical");
-            log.WriteEntry("OnStop");
+            log.WriteEntry("OnStop", "OnStop");
 
             isStopping = true;
 
@@ -577,7 +577,7 @@ namespace WorkerRole
         private void RoleEnvironmentChanging(object sender, RoleEnvironmentChangingEventArgs e)
         {
             Tracer.WriteLine("RoleEnvironmentChanging", "Information");
-            log.WriteEntry("RoleEnvironmentChanging");
+            log.WriteEntry("RoleEnvironmentChanging", "RoleEnvironmentChanging");
 
             // These configuration changes don't require a restart
             string[] exemptConfigurationItems =
@@ -602,7 +602,8 @@ namespace WorkerRole
         private void RoleEnvironmentChanged(object sender, RoleEnvironmentChangedEventArgs e)
         {
             Tracer.WriteLine("RoleEnvironmentChanged", "Information");
-            log.WriteEntry("RoleEnvironmentChanged");
+            log.WriteEntry("RoleEnvironmentChanged", "RoleEnvironmentChanged");
+
             Configure();
         }
     }
