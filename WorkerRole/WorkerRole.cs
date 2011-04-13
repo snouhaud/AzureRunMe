@@ -21,8 +21,8 @@ using System.Linq;
 using System.Net;
 using Microsoft.ServiceBus.Samples;
 using Microsoft.WindowsAzure.Diagnostics;
-using Microsoft.WindowsAzure.ServiceRuntime
-;
+using Microsoft.WindowsAzure.ServiceRuntime;
+
 namespace WorkerRole
 {
     public class WorkerRole : RoleEntryPoint
@@ -33,12 +33,14 @@ namespace WorkerRole
         public override void Run()
         {
             Tracer.WriteLine("WorkerRole entry point called", "Information");
+            Log.WriteEntry("WorkerRole.Run() called");
             runMe.Run();
             Tracer.WriteLine("WorkerRole exit", "Critical");
         }
 
         public override bool OnStart()
         {
+            Log.WriteEntry("WorkerRole.OnStart() called");
             runMe.OnStart();
 
             return base.OnStart();
@@ -47,6 +49,7 @@ namespace WorkerRole
         public override void OnStop()
         {
             Tracer.WriteLine("OnStop", "Critical");
+            Log.WriteEntry("WorkerRole.OnStop() called");
             runMe.OnStop();
 
             base.OnStop();

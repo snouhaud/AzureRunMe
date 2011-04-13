@@ -22,13 +22,13 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using Ionic.Zip;
 using Microsoft.ServiceBus.Samples;
 using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.Diagnostics;
 using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.StorageClient;
 using System.Threading;
+using SevenZip;
 
 
 namespace WorkerRole
@@ -64,7 +64,7 @@ namespace WorkerRole
         /// </summary>
         private string ExpandKeywords(string buffer)
         {
-            buffer = buffer.Replace("$approot$", "$roleroot$\approot");
+            buffer = buffer.Replace("$approot$", @"$roleroot$\approot");
             buffer = buffer.Replace("$deploymentid$", RoleEnvironment.DeploymentId);
             buffer = buffer.Replace("$roleinstanceid$", RoleEnvironment.CurrentRoleInstance.Id);
             buffer = buffer.Replace("$computername$", Environment.MachineName);
@@ -224,12 +224,15 @@ namespace WorkerRole
 
             Tracer.WriteLine(string.Format("Downloading {0} to {1}", blob.Uri, workingDirectory), "Information");
 
-            var bytes = blob.DownloadByteArray();
-            ZipFile zipFile = ZipFile.Read(bytes);
+            using (MemoryStream stream = new MemoryStream())
+            {
+                blob.DownloadToStream(stream);
 
-            Tracer.WriteLine(string.Format("Extracting {0}", packageName), "Information");
+                Tracer.WriteLine(string.Format("Extracting {0}", packageName), "Information");
 
-            zipFile.ExtractAll(workingDirectory, ExtractExistingFileAction.OverwriteSilently);
+                var extractor = new SevenZipExtractor(stream);
+                extractor.ExtractArchive(workingDirectory);
+            }
 
             Tracer.WriteLine("Extraction finished", "Information");
         }
@@ -442,6 +445,10 @@ namespace WorkerRole
 
                 workingDirectory = RoleEnvironment.GetConfigurationSettingValue("WorkingDirectory");
                 workingDirectory = ExpandKeywords(workingDirectory);
+
+                // set 7zip dll path
+                string sevenZipPath = Path.Combine(workingDirectory, @"Redist\7z64.dll");
+                SevenZipExtractor.SetLibraryPath(sevenZipPath);
 
                 environmentVariables = RoleEnvironment.GetConfigurationSettingValue("EnvironmentVariables");
 
