@@ -32,7 +32,7 @@
       <Setting name="ScheduledTransferLogLevelFilter" />
       <Setting name="ScheduledTransferPeriod" />
       <Setting name="TraceConnectionString" />
-      <Setting name="LogFormat" />
+      <Setting name="TraceFormat" />
       <Setting name="CloudDriveConnectionString" />
       <Setting name="CloudDrive" />
       <Setting name="CloudDriveSize" />

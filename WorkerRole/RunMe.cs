@@ -83,8 +83,8 @@ namespace WorkerRole
 
         private void Configure()
         {
-            string logFormat = RoleEnvironment.GetConfigurationSettingValue("LogFormat");
-            Tracer.format = ExpandKeywords(logFormat);
+            string traceFormat = RoleEnvironment.GetConfigurationSettingValue("TraceFormat");
+            Tracer.format = ExpandKeywords(traceFormat);
 
             LogLevel logLevel = (LogLevel)Enum.Parse(typeof(LogLevel), RoleEnvironment.GetConfigurationSettingValue("ScheduledTransferLogLevelFilter"));
             TimeSpan scheduledTransferPeriod = TimeSpan.FromMinutes(int.Parse(RoleEnvironment.GetConfigurationSettingValue("ScheduledTransferPeriod")));

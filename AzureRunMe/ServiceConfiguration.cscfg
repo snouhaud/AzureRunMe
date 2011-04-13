@@ -16,7 +16,7 @@
       <Setting name="ScheduledTransferLogLevelFilter" value="Verbose" />
       <Setting name="ScheduledTransferPeriod" value="1" />
       <Setting name="TraceConnectionString" value="ServicePath=trace/$roleinstanceid$;ServiceNamespace=YOURNAMESPACE;IssuerName=YOURISSUERNAME;IssuerSecret=YOURISSUERSECRET" />
-      <Setting name="LogFormat" value="$computername$: {0:u} {1}" />
+      <Setting name="TraceFormat" value="$computername$: {0:u} {1}" />
       <Setting name="CloudDriveConnectionString" value="DefaultEndpointsProtocol=http;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
       <Setting name="CloudDrive" value="drives\$computername$.vhd" />
       <Setting name="CloudDriveSize" value="64" />
