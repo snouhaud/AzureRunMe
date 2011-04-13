@@ -98,7 +98,7 @@ namespace Microsoft.ServiceBus.Samples
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 // In the unlikely event that we cant see the service bus
                 // then just ignore this message

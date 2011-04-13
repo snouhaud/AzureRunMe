@@ -2,9 +2,6 @@
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "doc", "doc", "{48A77C6E-D736-4328-9F80-1E676DB62E46}"
-	ProjectSection(SolutionItems) = preProject
-		README.md = README.md
-	EndProjectSection
 EndProject
 Project("{CC5FD16D-436D-48AD-A40C-5A424C6E3E79}") = "AzureRunMe", "AzureRunMe\AzureRunMe.ccproj", "{E352AB16-2881-4360-8FC0-2D8445A70681}"
 EndProject
