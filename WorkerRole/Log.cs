@@ -1,4 +1,4 @@
-﻿#region Copyright (c) 2011 Active Web Solutions Ltd
+﻿ #region Copyright (c) 2011 Active Web Solutions Ltd
 //
 // (C) Copyright 2011 Active Web Solutions Ltd
 //      All rights reserved.
@@ -28,30 +28,6 @@ namespace WorkerRole
         static readonly string LOG_TABLE_NAME = "AzureRunMeLog";
         static object semaphore = new object();
         static bool initialized = false;
-
-        public class LogEntry : TableServiceEntity
-        {
-            public LogEntry()
-            { }
-
-            public LogEntry(string message)
-            {
-                DateTime createdUtc = DateTime.UtcNow;
-
-                // separate partition key for each day
-                this.PartitionKey = (DateTime.MaxValue - createdUtc.Date).Ticks.ToString("d19");
-                this.RowKey = String.Format("{0}_{1}", (DateTime.MaxValue - createdUtc).Ticks.ToString("d19"), Guid.NewGuid().ToString());
-                this.Timestamp = createdUtc;
-                this.ComputerName = Environment.MachineName;
-                this.InstanceId = RoleEnvironment.CurrentRoleInstance.Id;
-                this.Message = message;
-            }
-
-            public string ComputerName { get; set; }
-            public string InstanceId { get; set; }
-            public string Message { get; set; }
-        }
-
 
         public static void Initialize()
         {
