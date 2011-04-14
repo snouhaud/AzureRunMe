@@ -1,6 +1,6 @@
-﻿#region Copyright (c) 2010 Active Web Solutions Ltd
+﻿#region Copyright (c) 2010 - 2011 Active Web Solutions Ltd
 //
-// (C) Copyright 2010 Active Web Solutions Ltd
+// (C) Copyright 2010 - 2011 Active Web Solutions Ltd
 //      All rights reserved.
 //
 // This software is provided "as is" without warranty of any kind,

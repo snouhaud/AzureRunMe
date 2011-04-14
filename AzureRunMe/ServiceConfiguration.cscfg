@@ -3,6 +3,7 @@
   <Role name="WorkerRole">
     <Instances count="1" />
     <ConfigurationSettings>
+      <Setting name="Label" value="YOUROWNPROJECTNAMEANDVERSION" />
       <Setting name="DataConnectionString" value="DefaultEndpointsProtocol=https;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
       <Setting name="Packages" value="packages/jre.zip;packages/dist.zip" />
       <Setting name="AlwaysInstallPackages" value="true" />

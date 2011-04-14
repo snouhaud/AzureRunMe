@@ -5,6 +5,9 @@ Probably the quickest way to get your legacy or third-party code running on Wind
 
 N.B. AzureRunMe has moved to https://github.com/blackwre/AzureRunMe
 
+WARNING - The source code is currently undergoing major refactoring - Version 1.0.0.15 in dist is the latest stable build,
+compile from latest source at your own risk!
+
 Introduction
 ------------
 

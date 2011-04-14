@@ -1,6 +1,6 @@
-﻿#region Copyright (c) 2010 Active Web Solutions Ltd
+﻿#region Copyright (c) 2010 - 2011 Active Web Solutions Ltd
 //
-// (C) Copyright 2010 Active Web Solutions Ltd
+// (C) Copyright 2010- 2011 Active Web Solutions Ltd
 //      All rights reserved.
 //
 // This software is provided "as is" without warranty of any kind,
@@ -19,7 +19,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading;
@@ -35,22 +34,34 @@ namespace WorkerRole
 {
     public class RunMe
     {
-        CloudStorageAccount storageAccount;
-        CloudStorageAccount cloudDriveStorageAccount; 
-        DiagnosticMonitorConfiguration config;
+        Log log;
         CloudDrive cloudDrive = null;
+
         string workingDirectory = null;
         string environmentVariables = null;
-        bool isStopping = false;
-        Log log;
+
+        List<Process> processes = null;
+
+        bool isRoleStopping = false; 
+
+        // Configuration setting keys
+        const string TRACE_FORMAT = "TraceFormat";
+        const string SCHEDULED_TRANSFER_PERIOD = "ScheduledTransferPeriod";
+        const string SCHEDULED_TRANSFER_LOG_LEVEL_FILTER = "ScheduledTransferLogLevelFilter";
+        const string DATA_CONNECTION_STRING = "DataConnectionString";
+        const string PACKAGES = "Packages";
+        const string WORKING_DIRECTORY = "WorkingDirectory";
+        const string COMMANDS = "Commands";
+        const string CLOUD_DRIVE_CONNECTION_STRING = "CloudDriveConnectionString";
+        const string CLOUD_DRIVE="CloudDrive";
+        const string CLOUD_DRIVE_SIZE="CloudDriveSize";
+        const string DEFAULT_CONNECTION_LIMIT = "DefaultConnectionLimit";
+        const string LABEL = "Label";
+
 
         public RunMe()
         {
-            storageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue("DataConnectionString"));
-            cloudDriveStorageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue("CloudDriveConnectionString"));
-
             log = new Log(RoleEnvironment.GetConfigurationSettingValue("LogConnectionString"));
-        
         }
 
         /// <summary>
@@ -81,13 +92,26 @@ namespace WorkerRole
             return buffer;
         }
 
-        private void Configure()
-        {
-            string traceFormat = RoleEnvironment.GetConfigurationSettingValue("TraceFormat");
-            Tracer.format = ExpandKeywords(traceFormat);
+        /// <summary>
+        /// Configures the maximum number of concurrent outbound connections
+        /// </summary>
+        private void ConfigureDefaultConnectionLimit()
+        { 
+            ServicePointManager.DefaultConnectionLimit = int.Parse(RoleEnvironment.GetConfigurationSettingValue(DEFAULT_CONNECTION_LIMIT));
+        }
 
-            LogLevel logLevel = (LogLevel)Enum.Parse(typeof(LogLevel), RoleEnvironment.GetConfigurationSettingValue("ScheduledTransferLogLevelFilter"));
-            TimeSpan scheduledTransferPeriod = TimeSpan.FromMinutes(int.Parse(RoleEnvironment.GetConfigurationSettingValue("ScheduledTransferPeriod")));
+        private void ConfigureTraceFormat()
+        {
+            string traceFormat = RoleEnvironment.GetConfigurationSettingValue(TRACE_FORMAT);
+            Tracer.format = ExpandKeywords(traceFormat);
+        }
+
+        private void ConfigureDiagnostics()
+        {
+            DiagnosticMonitorConfiguration diagnosticMonitorConfiguration = DiagnosticMonitor.GetDefaultInitialConfiguration();
+
+            LogLevel logLevel = (LogLevel)Enum.Parse(typeof(LogLevel), RoleEnvironment.GetConfigurationSettingValue(SCHEDULED_TRANSFER_LOG_LEVEL_FILTER));
+            TimeSpan scheduledTransferPeriod = TimeSpan.FromMinutes(int.Parse(RoleEnvironment.GetConfigurationSettingValue(SCHEDULED_TRANSFER_PERIOD)));
 
             // Windows Performance Counters
             List<string> counters = new List<string>();
@@ -101,26 +125,29 @@ namespace WorkerRole
                 PerformanceCounterConfiguration counterConfig = new PerformanceCounterConfiguration();
                 counterConfig.CounterSpecifier = counter;
                 counterConfig.SampleRate = scheduledTransferPeriod;
-                config.PerformanceCounters.DataSources.Add(counterConfig);
+                diagnosticMonitorConfiguration.PerformanceCounters.DataSources.Add(counterConfig);
             }
-            config.PerformanceCounters.ScheduledTransferPeriod = scheduledTransferPeriod;
+            diagnosticMonitorConfiguration.PerformanceCounters.ScheduledTransferPeriod = scheduledTransferPeriod;
 
             // Event Logs
-            config.WindowsEventLog.DataSources.Add("System!*");
-            config.WindowsEventLog.DataSources.Add("Application!*");
+            diagnosticMonitorConfiguration.WindowsEventLog.DataSources.Add("System!*");
+            diagnosticMonitorConfiguration.WindowsEventLog.DataSources.Add("Application!*");
             
             // NB Dont do this -> config.WindowsEventLog.DataSources.Add("Security!*");
 
-            config.WindowsEventLog.ScheduledTransferLogLevelFilter = logLevel; 
-            config.WindowsEventLog.ScheduledTransferPeriod = scheduledTransferPeriod;
+            diagnosticMonitorConfiguration.WindowsEventLog.ScheduledTransferLogLevelFilter = logLevel; 
+            diagnosticMonitorConfiguration.WindowsEventLog.ScheduledTransferPeriod = scheduledTransferPeriod;
  
             // Basic Logs
-            config.Logs.ScheduledTransferLogLevelFilter = logLevel;
-            config.Logs.ScheduledTransferPeriod = scheduledTransferPeriod;
+            diagnosticMonitorConfiguration.Logs.ScheduledTransferLogLevelFilter = logLevel;
+            diagnosticMonitorConfiguration.Logs.ScheduledTransferPeriod = scheduledTransferPeriod;
 
             // NB Only enables crash dumps for the worker role, not crash dumps for spawned processes
             // See http://www.robblackwell.org.uk/2010/10/27/advanced-debugging-on-windows-azure-with-adplus.html
             CrashDumps.EnableCollection(true);
+
+            // Start the diagnostic monitor with the modified configuration.
+            DiagnosticMonitor.Start("DiagnosticsConnectionString", diagnosticMonitorConfiguration);
 
         }
 
@@ -183,6 +210,8 @@ namespace WorkerRole
         /// </summary>
         private bool IsNewPackage(string containerName, string packageName)
         {
+            var storageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING));
+
             CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
 
             blobClient.RetryPolicy = RetryPolicies.Retry(100, TimeSpan.FromSeconds(1));
@@ -203,7 +232,7 @@ namespace WorkerRole
             }
             else
             {
-                Tracer.WriteLine(string.Format("{0} has previously been installed. Skipping download.", packageName), "Information");
+                Tracer.WriteLine(string.Format("{0} has previously been installed, skipping download.", packageName), "Information");
                 return false;
             }
         }
@@ -216,7 +245,9 @@ namespace WorkerRole
         /// <param name="workingDirectory">Where to extract the files</param>
         private void InstallPackage(string containerName, string packageName, string workingDirectory)
         {
-           
+
+            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING));
+
             CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
             
             blobClient.RetryPolicy = RetryPolicies.Retry(100, TimeSpan.FromSeconds(1));
@@ -254,7 +285,7 @@ namespace WorkerRole
         }
 
 
-        private void MountCloudDrive(string container,string vhdName, int size)
+        private void MountCloudDrive(string container, string vhdName, int size)
         {
             Tracer.WriteLine("Configuring CloudDrive", "Information");
 
@@ -288,8 +319,9 @@ namespace WorkerRole
                        Tracer.WriteLine("Using temporary workaround for ERROR_UNSUPPORTED_OS see http://bit.ly/fw7qzo", "Information");
                        Thread.Sleep(10000);
                    }
-            }            
+            }
 
+            CloudStorageAccount cloudDriveStorageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue(CLOUD_DRIVE_CONNECTION_STRING));
             CloudBlobClient blobClient = cloudDriveStorageAccount.CreateCloudBlobClient();
             blobClient.GetContainerReference(container).CreateIfNotExist();
 
@@ -345,7 +377,6 @@ namespace WorkerRole
                 WorkingDirectory = workingDirectory
             };
 
-            
             EnvironmentVariables(startInfo, environmentVariables);
 
             // Set an environment variable for each InstanceEndPoint
@@ -390,24 +421,21 @@ namespace WorkerRole
             return process;
         }
 
+        
         public bool OnStart()
         {
-            log.WriteEntry("OnStart", "OnStart");
+            log.WriteEntry("OnStart", RoleEnvironment.GetConfigurationSettingValue(LABEL));
 
-            config = DiagnosticMonitor.GetDefaultInitialConfiguration();
+            ConfigureTraceFormat();
 
-            Configure();
-
-            // Start the diagnostic monitor with the modified configuration.
-            DiagnosticMonitor.Start("DiagnosticsConnectionString", config);
+            ConfigureDiagnostics();
 
             // For information on handling configuration changes
             // see the MSDN topic at http://go.microsoft.com/fwlink/?LinkId=166357.
             RoleEnvironment.Changing += RoleEnvironmentChanging;
             RoleEnvironment.Changed += RoleEnvironmentChanged;
 
-            // Set the maximum number of concurrent outbound connections 
-            ServicePointManager.DefaultConnectionLimit = int.Parse(RoleEnvironment.GetConfigurationSettingValue("DefaultConnectionLimit"));
+            ConfigureDefaultConnectionLimit();
 
             // If a TraceConnectionString is specified then start a TraceConsole via the AppFabric Service Bus
             string traceConnectionString = RoleEnvironment.GetConfigurationSettingValue("TraceConnectionString");
@@ -423,14 +451,81 @@ namespace WorkerRole
             return true;
         }
 
+
+        private void InstallPackages()
+        {
+            bool alwaysInstallPackages = bool.Parse(RoleEnvironment.GetConfigurationSettingValue("AlwaysInstallPackages"));
+            Tracer.WriteLine(string.Format("AlwaysInstallPackages: {0}", alwaysInstallPackages), "Information");
+
+            // Retrieve the semicolon delimitted list of zip file packages and install them
+            string[] packages = RoleEnvironment.GetConfigurationSettingValue(PACKAGES).Split(';');
+            foreach (string package in packages)
+            {
+                try
+                {
+                    if (package != string.Empty)
+                    {
+                        // Parse out the container\file pair
+                        string[] fields = package.Split(new char[] { '/', '\\' }, 2);
+
+                        string containerName = fields[0];
+                        string packageName = fields[1];
+
+                        if (alwaysInstallPackages || IsNewPackage(containerName, packageName))
+                        {
+                            InstallPackage(containerName, packageName, workingDirectory);
+                            WritePackageReceipt(packageName);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Tracer.WriteLine(string.Format("Package \"{0}\" failed to install, {1}", package, e), "Information");
+                }
+            }
+        }
+
+
+        private void MountCloudDrive()
+        {
+            // If specified, mount a cloud drive
+            string cloudDrive = RoleEnvironment.GetConfigurationSettingValue(CLOUD_DRIVE);
+            if (cloudDrive != "")
+            {
+                int cloudDriveSize = Int32.Parse(RoleEnvironment.GetConfigurationSettingValue(CLOUD_DRIVE_SIZE));
+                cloudDrive = ExpandKeywords(cloudDrive);
+                string[] parts = cloudDrive.Split('\\');
+                MountCloudDrive(parts[0], parts[1], cloudDriveSize);
+            }
+        }
+
+        private void KillProcesses()
+        {
+            if (processes != null)
+                foreach (Process process in processes)
+                {
+                    Tracer.WriteLine(string.Format("Killing process: {0}", process.Id), "Information");
+                    process.Kill();
+                }
+        }
+
+        private List<Process> RunCommands()
+        {
+            string commands = RoleEnvironment.GetConfigurationSettingValue(COMMANDS);
+            return RunCommands(commands);
+            
+        }
+
         public void Run()
         {
             Tracer.WriteLine("WorkerRole entry point called", "Information");
-            log.WriteEntry("Run", "Run");
+            log.WriteEntry("Run", RoleEnvironment.GetConfigurationSettingValue(LABEL));
 
             Tracer.WriteLine(string.Format("AzureRunMe {0}", Version()), "Information");
             Tracer.WriteLine("Copyright (c) 2010 - 2011 Active Web Solutions Ltd [www.aws.net]", "Information");
             Tracer.WriteLine("", "Information");
+
+            Tracer.WriteLine(string.Format("Label: {0}",RoleEnvironment.GetConfigurationSettingValue(LABEL)), "Information");
 
             Tracer.WriteLine(string.Format("DeploymentId: {0}", RoleEnvironment.DeploymentId), "Information");
             Tracer.WriteLine(string.Format("RoleInstanceId: {0}", RoleEnvironment.CurrentRoleInstance.Id), "Information");
@@ -441,15 +536,7 @@ namespace WorkerRole
             try
             {
 
-                // If specified, mount a cloud drive
-                string cloudDrive = RoleEnvironment.GetConfigurationSettingValue("CloudDrive");
-                if (cloudDrive != "")
-                {
-                    int cloudDriveSize = Int32.Parse(RoleEnvironment.GetConfigurationSettingValue("CloudDriveSize"));
-                    cloudDrive = ExpandKeywords(cloudDrive);
-                    string[] parts = cloudDrive.Split('\\');
-                    MountCloudDrive(parts[0], parts[1], cloudDriveSize);
-                }
+                MountCloudDrive();
 
                 workingDirectory = RoleEnvironment.GetConfigurationSettingValue("WorkingDirectory");
                 workingDirectory = ExpandKeywords(workingDirectory);
@@ -460,38 +547,9 @@ namespace WorkerRole
 
                 environmentVariables = RoleEnvironment.GetConfigurationSettingValue("EnvironmentVariables");
 
-                bool alwaysInstallPackages = bool.Parse(RoleEnvironment.GetConfigurationSettingValue("AlwaysInstallPackages"));
-                Tracer.WriteLine(string.Format("AlwaysInstallPackages: {0}", alwaysInstallPackages), "Information");
+                InstallPackages();
 
-                // Retrieve the semicolon delimitted list of zip file packages and install them
-                string[] packages = RoleEnvironment.GetConfigurationSettingValue("Packages").Split(';');
-                foreach (string package in packages)
-                {
-                    try
-                    {
-                        if (package != string.Empty)
-                        {
-                            // Parse out the container\file pair
-                            string[] fields = package.Split(new char[] {'/','\\'}, 2);
-
-                            string containerName = fields[0];
-                            string packageName = fields[1];
-
-                            if (alwaysInstallPackages || IsNewPackage(containerName, packageName))
-                            {
-                                InstallPackage(containerName, packageName, workingDirectory);
-                                WritePackageReceipt(packageName);
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Tracer.WriteLine(string.Format("Package \"{0}\" failed to install, {1}", package, e), "Information");
-                    }
-                }
-
-                string commands = RoleEnvironment.GetConfigurationSettingValue("Commands");
-                RunCommands(commands);
+                WaitForCommandsExit(RunCommands());
 
                 // If DontExit is set, then keep runing even though all the Commands have finished
                 // (Useful if you want to RDP in afterwards). 
@@ -500,7 +558,7 @@ namespace WorkerRole
                 Tracer.WriteLine(string.Format("DontExit: {0}", dontExit), "Information");
 
                 if (dontExit)
-                    while (!isStopping)
+                    while (!isRoleStopping)
                         Thread.Sleep(1000);
 
                 Tracer.WriteLine("Run method exiting", "Information");
@@ -514,21 +572,38 @@ namespace WorkerRole
             Tracer.WriteLine("WorkerRole exit", "Critical");
         }
 
-        public void OnStop()
+        private void UnmountCloudDrive()
         {
-            Tracer.WriteLine("OnStop", "Critical");
-            log.WriteEntry("OnStop", "OnStop");
-
-            isStopping = true;
-
-            string commands = RoleEnvironment.GetConfigurationSettingValue("OnStopCommands");
-            RunCommands(commands);
-
             if (cloudDrive != null)
             {
                 Tracer.WriteLine(string.Format("Unmounting {0} from {1}", cloudDrive.Uri, cloudDrive.LocalPath), "Information");
                 cloudDrive.Unmount();
             }
+        }
+
+        private void Stop()
+        {
+            
+
+            string commands = RoleEnvironment.GetConfigurationSettingValue("OnStopCommands");
+            WaitForCommandsExit(RunCommands(commands));
+
+            // A potential snag is if the user's stop commands never exit, but ignore that for now
+
+            KillProcesses();
+
+            UnmountCloudDrive();
+        }
+        
+
+        public void OnStop()
+        {
+            Tracer.WriteLine("OnStop", "Critical");
+            log.WriteEntry("OnStop", RoleEnvironment.GetConfigurationSettingValue(LABEL));
+
+            isRoleStopping = true;
+
+            Stop();
         }
 
         private void EnvironmentVariables(ProcessStartInfo processStartInfo, string environmentVariables)
@@ -544,9 +619,19 @@ namespace WorkerRole
             }
         }
 
-        private void RunCommands(string commandList)
+        private void WaitForCommandsExit(List<Process> processes)
         {
-            // Spawn new a new process for each command
+            // Wait for all processes to exit
+            foreach (Process process in processes)
+            {
+                process.WaitForExit();
+                Tracer.WriteLine(string.Format("Exit {0}, code {1}", process.Handle, process.ExitCode), "Information");
+            }
+        }
+
+        private List<Process> RunCommands(string commandList)
+        {
+            // Spawn a new process for each command
             List<Process> processes = new List<Process>();
             string[] commands = commandList.Split(';');
             foreach (string command in commands)
@@ -565,46 +650,97 @@ namespace WorkerRole
                 }
             }
 
-            // Wait for all processes to exit
-            foreach (Process process in processes)
-            {
-                process.WaitForExit();
-                Tracer.WriteLine(string.Format("Exit {0}, code {1}", process.Handle, process.ExitCode), "Information");
-            }
+            return processes;
 
         }
 
         private void RoleEnvironmentChanging(object sender, RoleEnvironmentChangingEventArgs e)
         {
             Tracer.WriteLine("RoleEnvironmentChanging", "Information");
-            log.WriteEntry("RoleEnvironmentChanging", "RoleEnvironmentChanging");
+            log.WriteEntry("RoleEnvironmentChanging", RoleEnvironment.GetConfigurationSettingValue(LABEL));
 
-            // These configuration changes don't require a restart
-            string[] exemptConfigurationItems =
-                new[] { "ScheduledTransferLogLevelFilter", "ScheduledTransferPeriod", "LogFormat" };
-
-            var changes = from x in e.Changes.OfType<RoleEnvironmentConfigurationSettingChange>() select x.ConfigurationSettingName;
-
-            foreach (string change in changes)
-            {
-                if (!exemptConfigurationItems.Contains(change))
-                    // Restart this instance
-                    e.Cancel = true;
-            }
-
-            if (e.Cancel)
-                Tracer.WriteLine("RoleEnvironmentChanging cancelled", "Information");
-            else
-                Tracer.WriteLine("RoleEnvironmentChanging continued", "Information");
-
+            // Don't object to any role environment changes
+            // See RoleEnvironmentChanged for our attempt to cope with the changes
         }
 
         private void RoleEnvironmentChanged(object sender, RoleEnvironmentChangedEventArgs e)
         {
             Tracer.WriteLine("RoleEnvironmentChanged", "Information");
-            log.WriteEntry("RoleEnvironmentChanged", "RoleEnvironmentChanged");
+            log.WriteEntry("RoleEnvironmentChanged", RoleEnvironment.GetConfigurationSettingValue(LABEL));
 
-            Configure();
-        }
+            bool reconfigureDiagnostics = false;
+            bool reinstallPackages = false;
+            bool remountCLoudDrive = false;
+
+            foreach (RoleEnvironmentChange roleEnvironmentChange in e.Changes)
+            {
+                if (roleEnvironmentChange.GetType() == typeof(RoleEnvironmentConfigurationSettingChange))
+                {
+
+                    RoleEnvironmentConfigurationSettingChange x = (RoleEnvironmentConfigurationSettingChange)roleEnvironmentChange;
+
+                    Tracer.WriteLine(x.ConfigurationSettingName + " changed.", "Information");
+                    log.WriteEntry("RoleEnvironmentConfigurationSettingChange", x.ConfigurationSettingName);
+
+                    switch (x.ConfigurationSettingName)
+                    {
+                        case TRACE_FORMAT:
+                            ConfigureTraceFormat();
+                            break;
+
+                        case SCHEDULED_TRANSFER_LOG_LEVEL_FILTER:
+                        case SCHEDULED_TRANSFER_PERIOD:
+                            reconfigureDiagnostics = true;
+                            break;
+
+                        case DATA_CONNECTION_STRING:
+                        case PACKAGES:
+                        case COMMANDS:
+                            reinstallPackages = true;
+                            break;
+
+                        case CLOUD_DRIVE_CONNECTION_STRING:
+                        case CLOUD_DRIVE:
+                        case CLOUD_DRIVE_SIZE:
+                            remountCLoudDrive = true;
+                            break;
+
+                        case DEFAULT_CONNECTION_LIMIT:
+                            ConfigureDefaultConnectionLimit();
+                            break;
+
+                        // TODO: Support Trace changes
+                    }
+
+                }
+                else if (roleEnvironmentChange.GetType() == typeof(RoleEnvironmentTopologyChange))
+                {
+                    Tracer.WriteLine("RoleEnvironmentTopologyChange", "Information");
+                    log.WriteEntry("RoleEnvironmentTopologyChange", "RoleEnvironmentTopologyChange");
+                }
+                else
+                {
+                    Tracer.WriteLine("UnknownRoleEnvironmentChange", "Information");
+                    log.WriteEntry("UnknownRoleEnvironmentChange", RoleEnvironment.GetConfigurationSettingValue(LABEL));
+                }
+            }
+
+            if (remountCLoudDrive)
+            {
+                UnmountCloudDrive();
+                MountCloudDrive();
+            }
+
+            if (reconfigureDiagnostics)
+                ConfigureDiagnostics();
+
+            if (reinstallPackages)
+            {
+                // Assumes DontExit is true to be of any real value
+                Stop();
+                InstallPackages();
+                processes = RunCommands();
+            }
+        }        
     }
 }

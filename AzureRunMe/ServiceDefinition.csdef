@@ -37,6 +37,7 @@
       <Setting name="CloudDrive" />
       <Setting name="CloudDriveSize" />
       <Setting name="LogConnectionString" />
+      <Setting name="Label" />
     </ConfigurationSettings>
     <Imports>
       <Import moduleName="RemoteAccess" />
