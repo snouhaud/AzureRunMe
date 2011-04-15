@@ -39,6 +39,5 @@ namespace WorkerRole
             runMe.OnStop();
             base.OnStop();
         }
-   
     }
 }

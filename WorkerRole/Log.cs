@@ -18,12 +18,12 @@
 using System;
 using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.ServiceRuntime;
 
 namespace WorkerRole
 {
     public class Log
     {
-        const string LOG_TABLE_NAME = "AzureRunMeLog";
         CloudTableClient cloudTableClient;
 
         public Log(string connectionString)
@@ -32,14 +32,16 @@ namespace WorkerRole
             cloudTableClient = account.CreateCloudTableClient();
         }
 
-        public void WriteEntry(string eventName, string details)
+        public void WriteEntry(string eventName, string notes, string label)
         {
             try
             {
-                cloudTableClient.CreateTableIfNotExist(LOG_TABLE_NAME);
+                string tableName = RoleEnvironment.GetConfigurationSettingValue("LogTableName");
+
+                cloudTableClient.CreateTableIfNotExist(tableName);
                 
                 TableServiceContext dataContext = cloudTableClient.GetDataServiceContext();
-                dataContext.AddObject(LOG_TABLE_NAME, new LogEntry(eventName, details));
+                dataContext.AddObject(tableName, new LogEntry(eventName, notes, label));
                 dataContext.SaveChangesWithRetries();
             }
             catch (Exception e)

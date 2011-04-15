@@ -1,23 +1,33 @@
-AzureRunMe 1.0.0.15
+AzureRunMe 1.0.0.17
 ===================
 
 Probably the quickest way to get your legacy or third-party code running on Windows Azure.
 
 N.B. AzureRunMe has moved to https://github.com/blackwre/AzureRunMe
 
-WARNING - The source code is currently undergoing major refactoring - Version 1.0.0.15 in dist is the latest stable build,
-compile from latest source at your own risk!
-
 Introduction
 ------------
 
-AzureRunMe is a boostrap program that provides an off-the-shelf CSPKG file that you can upload to Windows Azure Conpute and run.
+AzureRunMe is a boostrap program that provides an off-the-shelf CSPKG file that you can upload to Windows Azure Compute and just run.
 
-From there you can upload you code via ZIP files in Blob Store and kick off your processes in a repeatable way, just by changing configuration.
+From there you can upload your code via ZIP files in Blob Storage and kick off your processes in a repeatable way, just by changing configuration.
 
 AzureRunMe preconfigures Remote Desktop access, making it easy to debug and diagnose problems.
 
 If you are using Java, Clojure, C++ or other languages this might be the quickest way to get your code running in Azure without having to worry about building any .NET code.
+
+News for v17
+------------
+
+Now supports 7zip (as well as ZIP) for greater compression.
+
+Configuration includes a "Label" to allow you to annotate the configuration and various logs with your own product name and version.
+
+All Starts, Stops and RoleEnvironment changes are now logged to a separate log table in Table Storage to give you a quick indication of operations and SLA.
+
+An *experimental* feature allows you to reload and re run packages and commands without rebooting - just change the UpdateIndicator flag in configuration.
+
+NB The certificate has changed (but you should probably use your own anyway!)
 
 Background
 ----------
@@ -28,7 +38,7 @@ Everyone seems to write their own boostrap program. I thought there ought to be 
 I wanted something simple that took a self contained ZIP file, unpacked it and just executed a batch file. 
 All the role information like ipaddress and port could be passed as environment variables %IPAddress% or %Http% etc.
 
-I wanted ZIP files to be stored in Blob store to allow them to be easily updated with all Configuration settings in the Azure Service Configuration.
+I wanted ZIP files to be stored in Blob storage to allow them to be easily updated with all configuration settings in the Azure Service Configuration file.
 
 I wanted real time tracing of stdio, stderr, debug, log4j etc.
 
@@ -37,13 +47,12 @@ AzureRunMe was born, and to my very great suprise, is now being used by a number
 Example Scenarios
 -----------------
 
-Run one or more simple Java console apps:
-* One or more CSharp console apps,without any code change
 * A Tomcat hosted web application
 * A JBOSS hosted app
 * A legacy C / C++ application
 * A Clojure / Compojure app
 * A Common Lisp app
+* A Delphi back end server
 * A Ruby on Rails web app
 * Use PortBridgeAgent to proxy some ports from an intranet server e.g. LDAP.
 * Use PortBridge to proxy internal endpoints back to on premises e.g. JPDA to your Eclipse debugger
@@ -55,7 +64,7 @@ There are three files in the dist directory
 
 AzureRunMe.cspkg - The package file, ready to upload and use
 ServiceConfiguration.cscfg - The configuration file - you'll need to edit this with your various credentials
-AzureRunMeRDP.pfx - A sample certificate that you can use for RDP **
+AzureRunMe RDP.pfx - A sample certificate that you can use for RDP **
 
 Upload the certificate (password is tiger123!)
 
@@ -135,7 +144,6 @@ All InputEndPoints are setup too, according to the CSDEF, by default this is:
 * %telnet% the port corresponding to 23
 * %http-alt% the port corresponding to 8080
 
-There are also two default InternalEndPoints %port1% and %port2%
 
 Compiling AzureRunMe
 --------------------
@@ -144,8 +152,7 @@ Prerequisites:
 
 * Visual Studio 2010
 * The Windows Azure SDK & Tools for Visual Studio
-* The Windows Azure AppFabric 
-(see http://msdn.microsoft.com/en-us/windowsazure/cc974146.aspx )
+* The Windows Azure AppFabric SDK
 
 Diagnostics
 -----------
@@ -158,7 +165,7 @@ The level of logging and the frequency (in minutes) with which logs are shipped 
 		<Setting name="ScheduledTransferPeriod" value="1"/>
 
 I recommend Cerebrata's [Windows Azure Diagostics Manager](http://www.cerebrata.com/products/AzureDiagnosticsManager/Default.aspx) for viewing
-the output. (I really ought to be on commission!).
+the output.
 
 Packages
 --------
@@ -215,6 +222,7 @@ Several of the configuration file settings support expansion of these variables
 * $roleroot$" expands to the role root directory
 * $clouddrive$" expands to the directory where the clouddrive is mounted
 * $approot$ expands to $roleroot$\approot
+* $version$ expands to the AzureRunMe version e.g. 1.0.0 .17
 
 Advanced Tracing
 ----------------
@@ -389,11 +397,13 @@ That old swiss army knife 7 Zip http://www.7-zip.org/, works too. Thanks to Jsun
 Credits
 -------
 
-This project uses Ionic Zip library, part of a CodePlex project at http://www.codeplex.com/DotNetZip which is distributed under the terms of the Microsoft Public License.
+SevenZipSharp http://sevenzipsharp.codeplex.com/ is distributed under the terms of the GNU Lesser General Public License.
 
 TraceConsole and TraceListener are code samples from the Microsoft appFabric SDK (with minor modifications).
 
 Thanks to Jsun for lots of constructive ideas and testing to near destruction!
+
+Thanks to Michal Kruml for various patches.
 
 Thanks to Steve Marx for inspirational code samples and workarounds.
 
@@ -406,5 +416,5 @@ See http://www.aws.net/azurelaunchpad or contact info@aws.net if you'd like to h
 
 Rob Blackwell
 
-January 2011
+April 2011
 

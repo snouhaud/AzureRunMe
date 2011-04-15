@@ -1,6 +1,6 @@
 ﻿#region Copyright (c) 2010 - 2011 Active Web Solutions Ltd
 //
-// (C) Copyright 2010- 2011 Active Web Solutions Ltd
+// (C) Copyright 2010 - 2011 Active Web Solutions Ltd
 //      All rights reserved.
 //
 // This software is provided "as is" without warranty of any kind,
@@ -35,14 +35,13 @@ namespace WorkerRole
     public class RunMe
     {
         Log log;
-        CloudDrive cloudDrive = null;
 
-        string workingDirectory = null;
-        string environmentVariables = null;
+        CloudDrive cloudDrive = null;
 
         List<Process> processes = null;
 
-        bool isRoleStopping = false; 
+        bool isRoleStopping = false;
+        bool roleIsBusy = false;
 
         // Configuration setting keys
         const string TRACE_FORMAT = "TraceFormat";
@@ -57,17 +56,22 @@ namespace WorkerRole
         const string CLOUD_DRIVE_SIZE="CloudDriveSize";
         const string DEFAULT_CONNECTION_LIMIT = "DefaultConnectionLimit";
         const string LABEL = "Label";
-
+        const string UPDATE_INDICATOR = "UpdateIndicator";
+        const string PRE_UPDATE_SLEEP = "PreUpdateSleep";
+        const string POST_UPDATE_COMMANDS = "PostUpdateCommands";
+        const string PRE_UPDATE_COMMANDS = "PreUpdateCommands";
+        const string LOG_CONNECTION_STRING = "LogConnectionString";
+        const string DONT_EXIT = "DontExit";
 
         public RunMe()
         {
-            log = new Log(RoleEnvironment.GetConfigurationSettingValue("LogConnectionString"));
+            log = new Log(RoleEnvironment.GetConfigurationSettingValue(LOG_CONNECTION_STRING));
         }
 
         /// <summary>
         /// Get the version from the Assembly Information
         /// </summary>
-        public static string Version()
+        public static string GetVersion()
         {
             return new AssemblyName(Assembly.GetExecutingAssembly().FullName).Version.ToString();
         }
@@ -85,6 +89,7 @@ namespace WorkerRole
             buffer = buffer.Replace("$guid$", Guid.NewGuid().ToString());
             buffer = buffer.Replace("$now$", DateTime.Now.ToString());
             buffer = buffer.Replace("$roleroot$", Environment.GetEnvironmentVariable("RoleRoot"));
+            buffer = buffer.Replace("$version$", GetVersion());
 
             if (cloudDrive != null)
                 buffer = buffer.Replace("$clouddrive$", cloudDrive.LocalPath);
@@ -97,17 +102,24 @@ namespace WorkerRole
         /// </summary>
         private void ConfigureDefaultConnectionLimit()
         { 
-            ServicePointManager.DefaultConnectionLimit = int.Parse(RoleEnvironment.GetConfigurationSettingValue(DEFAULT_CONNECTION_LIMIT));
+            int limit = int.Parse(RoleEnvironment.GetConfigurationSettingValue(DEFAULT_CONNECTION_LIMIT));
+            ServicePointManager.DefaultConnectionLimit = limit;
+
+            Tracer.WriteLine(string.Format("ServicePointManager.DefaultConnectionLimit = {0}", limit), "Information");
         }
 
         private void ConfigureTraceFormat()
         {
             string traceFormat = RoleEnvironment.GetConfigurationSettingValue(TRACE_FORMAT);
             Tracer.format = ExpandKeywords(traceFormat);
+
+            Tracer.WriteLine(string.Format("Tracer.format = {0}", traceFormat), "Information");
         }
 
         private void ConfigureDiagnostics()
         {
+            Tracer.WriteLine("ConfigureDiagnostics", "Information");
+
             DiagnosticMonitorConfiguration diagnosticMonitorConfiguration = DiagnosticMonitor.GetDefaultInitialConfiguration();
 
             LogLevel logLevel = (LogLevel)Enum.Parse(typeof(LogLevel), RoleEnvironment.GetConfigurationSettingValue(SCHEDULED_TRANSFER_LOG_LEVEL_FILTER));
@@ -120,6 +132,7 @@ namespace WorkerRole
             counters.Add(@"\TCPv4\Connections Established");
             counters.Add(@"\Network Interface(*)\Bytes Received/sec");
             counters.Add(@"\Network Interface(*)\Bytes Sent/sec");
+
             foreach (string counter in counters)
             {
                 PerformanceCounterConfiguration counterConfig = new PerformanceCounterConfiguration();
@@ -127,6 +140,7 @@ namespace WorkerRole
                 counterConfig.SampleRate = scheduledTransferPeriod;
                 diagnosticMonitorConfiguration.PerformanceCounters.DataSources.Add(counterConfig);
             }
+
             diagnosticMonitorConfiguration.PerformanceCounters.ScheduledTransferPeriod = scheduledTransferPeriod;
 
             // Event Logs
@@ -264,7 +278,7 @@ namespace WorkerRole
 
                 Tracer.WriteLine(string.Format("Extracting {0}", packageName), "Information");
 
-                var extractor = new SevenZipExtractor(stream);
+                SevenZipExtractor extractor = new SevenZipExtractor(stream);
                 extractor.ExtractArchive(workingDirectory);
             }
 
@@ -421,10 +435,19 @@ namespace WorkerRole
             return process;
         }
 
+        public string GetLabel()
+        {
+            return ExpandKeywords(RoleEnvironment.GetConfigurationSettingValue(LABEL));
+        }
+
+        public string GetWorkingDirectory()
+        {
+            return ExpandKeywords(RoleEnvironment.GetConfigurationSettingValue("WorkingDirectory"));
+        }
         
         public bool OnStart()
         {
-            log.WriteEntry("OnStart", RoleEnvironment.GetConfigurationSettingValue(LABEL));
+            log.WriteEntry("OnStart", "", GetLabel());
 
             ConfigureTraceFormat();
 
@@ -434,6 +457,9 @@ namespace WorkerRole
             // see the MSDN topic at http://go.microsoft.com/fwlink/?LinkId=166357.
             RoleEnvironment.Changing += RoleEnvironmentChanging;
             RoleEnvironment.Changed += RoleEnvironmentChanged;
+
+            RoleEnvironment.StatusCheck += RoleEnvironmentStatusCheck;
+            RoleEnvironment.Stopping += RoleEnvironmentStopping;
 
             ConfigureDefaultConnectionLimit();
 
@@ -454,8 +480,12 @@ namespace WorkerRole
 
         private void InstallPackages()
         {
+            Tracer.WriteLine("InstallPackages", "Information");
+
             bool alwaysInstallPackages = bool.Parse(RoleEnvironment.GetConfigurationSettingValue("AlwaysInstallPackages"));
             Tracer.WriteLine(string.Format("AlwaysInstallPackages: {0}", alwaysInstallPackages), "Information");
+
+            string workingDirectory = GetWorkingDirectory();
 
             // Retrieve the semicolon delimitted list of zip file packages and install them
             string[] packages = RoleEnvironment.GetConfigurationSettingValue(PACKAGES).Split(';');
@@ -506,6 +536,7 @@ namespace WorkerRole
                 {
                     Tracer.WriteLine(string.Format("Killing process: {0}", process.Id), "Information");
                     process.Kill();
+                    Tracer.WriteLine(string.Format("Process: {0} killed", process.Id), "Information");
                 }
         }
 
@@ -519,13 +550,13 @@ namespace WorkerRole
         public void Run()
         {
             Tracer.WriteLine("WorkerRole entry point called", "Information");
-            log.WriteEntry("Run", RoleEnvironment.GetConfigurationSettingValue(LABEL));
+            log.WriteEntry("Run", "", GetLabel());
 
-            Tracer.WriteLine(string.Format("AzureRunMe {0}", Version()), "Information");
+            Tracer.WriteLine(string.Format("AzureRunMe {0}", GetVersion()), "Information");
             Tracer.WriteLine("Copyright (c) 2010 - 2011 Active Web Solutions Ltd [www.aws.net]", "Information");
             Tracer.WriteLine("", "Information");
 
-            Tracer.WriteLine(string.Format("Label: {0}",RoleEnvironment.GetConfigurationSettingValue(LABEL)), "Information");
+            Tracer.WriteLine(string.Format("Label: {0}",GetLabel()), "Information");
 
             Tracer.WriteLine(string.Format("DeploymentId: {0}", RoleEnvironment.DeploymentId), "Information");
             Tracer.WriteLine(string.Format("RoleInstanceId: {0}", RoleEnvironment.CurrentRoleInstance.Id), "Information");
@@ -538,14 +569,11 @@ namespace WorkerRole
 
                 MountCloudDrive();
 
-                workingDirectory = RoleEnvironment.GetConfigurationSettingValue("WorkingDirectory");
-                workingDirectory = ExpandKeywords(workingDirectory);
+                string workingDirectory = GetWorkingDirectory();
 
                 // set 7zip dll path
                 string sevenZipPath = Path.Combine(workingDirectory, @"Redist\7z64.dll");
                 SevenZipExtractor.SetLibraryPath(sevenZipPath);
-
-                environmentVariables = RoleEnvironment.GetConfigurationSettingValue("EnvironmentVariables");
 
                 InstallPackages();
 
@@ -553,7 +581,7 @@ namespace WorkerRole
 
                 // If DontExit is set, then keep runing even though all the Commands have finished
                 // (Useful if you want to RDP in afterwards). 
-                bool dontExit = bool.Parse(RoleEnvironment.GetConfigurationSettingValue("DontExit"));
+                bool dontExit = bool.Parse(RoleEnvironment.GetConfigurationSettingValue(DONT_EXIT));
 
                 Tracer.WriteLine(string.Format("DontExit: {0}", dontExit), "Information");
 
@@ -581,29 +609,19 @@ namespace WorkerRole
             }
         }
 
-        private void Stop()
+        public void OnStop()
         {
-            
+            Tracer.WriteLine("OnStop", "Critical");
+            log.WriteEntry("OnStop", "", GetLabel());
+
+            isRoleStopping = true;
 
             string commands = RoleEnvironment.GetConfigurationSettingValue("OnStopCommands");
             WaitForCommandsExit(RunCommands(commands));
 
-            // A potential snag is if the user's stop commands never exit, but ignore that for now
-
-            KillProcesses();
-
             UnmountCloudDrive();
-        }
-        
 
-        public void OnStop()
-        {
-            Tracer.WriteLine("OnStop", "Critical");
-            log.WriteEntry("OnStop", RoleEnvironment.GetConfigurationSettingValue(LABEL));
-
-            isRoleStopping = true;
-
-            Stop();
+            Tracer.WriteLine("OnStop Finished", "Critical");
         }
 
         private void EnvironmentVariables(ProcessStartInfo processStartInfo, string environmentVariables)
@@ -625,12 +643,17 @@ namespace WorkerRole
             foreach (Process process in processes)
             {
                 process.WaitForExit();
-                Tracer.WriteLine(string.Format("Exit {0}, code {1}", process.Handle, process.ExitCode), "Information");
+                Tracer.WriteLine(string.Format("Process exit {0}, code {1}", process.Handle, process.ExitCode), "Information");
             }
         }
 
         private List<Process> RunCommands(string commandList)
         {
+
+            string environmentVariables = RoleEnvironment.GetConfigurationSettingValue("EnvironmentVariables");
+
+            string workingDirectory = GetWorkingDirectory();
+
             // Spawn a new process for each command
             List<Process> processes = new List<Process>();
             string[] commands = commandList.Split(';');
@@ -642,6 +665,7 @@ namespace WorkerRole
                     {
                         Process process = Run(workingDirectory, environmentVariables, command);
                         processes.Add(process);
+                        Tracer.WriteLine(string.Format("Process {0} started,({1})",  process.Handle, command), "Information");
                     }
                 }
                 catch (Exception e)
@@ -657,32 +681,80 @@ namespace WorkerRole
         private void RoleEnvironmentChanging(object sender, RoleEnvironmentChangingEventArgs e)
         {
             Tracer.WriteLine("RoleEnvironmentChanging", "Information");
-            log.WriteEntry("RoleEnvironmentChanging", RoleEnvironment.GetConfigurationSettingValue(LABEL));
+            log.WriteEntry("RoleEnvironmentChanging", "", GetLabel());
 
             // Don't object to any role environment changes
             // See RoleEnvironmentChanged for our attempt to cope with the changes
         }
 
+        private void RoleEnvironmentStatusCheck(object sender, RoleInstanceStatusCheckEventArgs e)
+        {
+            if (roleIsBusy)
+                e.SetBusy();
+        }
+
+
+        private void DoUpdate()
+        {
+            Tracer.WriteLine("DoUpdate", "Information");
+
+            roleIsBusy = true;
+
+            Tracer.WriteLine("PreUpdateCommands", "Information");
+
+            string commands = RoleEnvironment.GetConfigurationSettingValue(PRE_UPDATE_COMMANDS);
+            WaitForCommandsExit(RunCommands(commands));
+
+            // A potential snag is if the user's pre update commands never exit,  but ignore that for now
+
+            // Wait for any asynchronous stop actions like Tomcat
+            int sleep = int.Parse(RoleEnvironment.GetConfigurationSettingValue(PRE_UPDATE_SLEEP));
+            Tracer.WriteLine(String.Format("Sleeping {0}", sleep), "Information");
+            Thread.Sleep(sleep);
+
+            // Hopefully, everything will have shut down cleanly, but just in case ..
+            KillProcesses();
+
+            InstallPackages();
+
+            Tracer.WriteLine("PostUpdateCommands", "Information");
+
+            commands = RoleEnvironment.GetConfigurationSettingValue(POST_UPDATE_COMMANDS);
+            processes = RunCommands(commands);
+    
+            roleIsBusy = false;
+
+            Tracer.WriteLine("DoUpdate Finished", "Information");
+        }
+
+        private void RoleEnvironmentStopping(object sender, RoleEnvironmentStoppingEventArgs e)
+        {
+            Tracer.WriteLine("RoleEnvironmentStopping " , "Information");
+            log.WriteEntry("RoleEnvironmentStopping", "", GetLabel());
+        }
+
         private void RoleEnvironmentChanged(object sender, RoleEnvironmentChangedEventArgs e)
         {
             Tracer.WriteLine("RoleEnvironmentChanged", "Information");
-            log.WriteEntry("RoleEnvironmentChanged", RoleEnvironment.GetConfigurationSettingValue(LABEL));
+            log.WriteEntry("RoleEnvironmentChanged", "", GetLabel());
 
             bool reconfigureDiagnostics = false;
-            bool reinstallPackages = false;
-            bool remountCLoudDrive = false;
+            bool update = false;
+            bool remountCloudDrive = false;
 
             foreach (RoleEnvironmentChange roleEnvironmentChange in e.Changes)
             {
                 if (roleEnvironmentChange.GetType() == typeof(RoleEnvironmentConfigurationSettingChange))
                 {
 
-                    RoleEnvironmentConfigurationSettingChange x = (RoleEnvironmentConfigurationSettingChange)roleEnvironmentChange;
+                    RoleEnvironmentConfigurationSettingChange change = (RoleEnvironmentConfigurationSettingChange)roleEnvironmentChange;
 
-                    Tracer.WriteLine(x.ConfigurationSettingName + " changed.", "Information");
-                    log.WriteEntry("RoleEnvironmentConfigurationSettingChange", x.ConfigurationSettingName);
+                    string message = string.Format("{0} = \"{1}\"", change.ConfigurationSettingName, RoleEnvironment.GetConfigurationSettingValue(change.ConfigurationSettingName));
 
-                    switch (x.ConfigurationSettingName)
+                    Tracer.WriteLine(message, "Information");
+                    log.WriteEntry("RoleEnvironmentConfigurationSettingChange", message, GetLabel());
+
+                    switch (change.ConfigurationSettingName)
                     {
                         case TRACE_FORMAT:
                             ConfigureTraceFormat();
@@ -693,16 +765,14 @@ namespace WorkerRole
                             reconfigureDiagnostics = true;
                             break;
 
-                        case DATA_CONNECTION_STRING:
-                        case PACKAGES:
-                        case COMMANDS:
-                            reinstallPackages = true;
+                        case UPDATE_INDICATOR:
+                            update = true;
                             break;
 
                         case CLOUD_DRIVE_CONNECTION_STRING:
                         case CLOUD_DRIVE:
                         case CLOUD_DRIVE_SIZE:
-                            remountCLoudDrive = true;
+                            remountCloudDrive = true;
                             break;
 
                         case DEFAULT_CONNECTION_LIMIT:
@@ -716,16 +786,16 @@ namespace WorkerRole
                 else if (roleEnvironmentChange.GetType() == typeof(RoleEnvironmentTopologyChange))
                 {
                     Tracer.WriteLine("RoleEnvironmentTopologyChange", "Information");
-                    log.WriteEntry("RoleEnvironmentTopologyChange", "RoleEnvironmentTopologyChange");
+                    log.WriteEntry("RoleEnvironmentTopologyChange", "", GetLabel());
                 }
                 else
                 {
                     Tracer.WriteLine("UnknownRoleEnvironmentChange", "Information");
-                    log.WriteEntry("UnknownRoleEnvironmentChange", RoleEnvironment.GetConfigurationSettingValue(LABEL));
+                    log.WriteEntry("UnknownRoleEnvironmentChange", roleEnvironmentChange.GetType().ToString(), GetLabel());
                 }
             }
 
-            if (remountCLoudDrive)
+            if (remountCloudDrive)
             {
                 UnmountCloudDrive();
                 MountCloudDrive();
@@ -734,13 +804,8 @@ namespace WorkerRole
             if (reconfigureDiagnostics)
                 ConfigureDiagnostics();
 
-            if (reinstallPackages)
-            {
-                // Assumes DontExit is true to be of any real value
-                Stop();
-                InstallPackages();
-                processes = RunCommands();
-            }
+            if (update)
+                DoUpdate();
         }        
     }
 }

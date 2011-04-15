@@ -19,29 +19,37 @@ using System;
 using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.StorageClient;
 
-public class LogEntry : TableServiceEntity
+namespace WorkerRole
 {
-    public LogEntry()
-    { }
-
-    public LogEntry(string eventName, string details)
+    public class LogEntry : TableServiceEntity
     {
-        DateTime createdUtc = DateTime.UtcNow;
+        public LogEntry()
+        { }
 
-        // Keep all entries for one machine together
-        this.PartitionKey = Environment.MachineName;
+        public LogEntry(string eventName, string notes, string label)
+        {
+            DateTime createdUtc = DateTime.UtcNow;
 
-        // Use reverse time so that entries are sorted chronologically with latest entries appearing first
-        this.RowKey = String.Format("{0}_{1}", (DateTime.MaxValue - createdUtc).Ticks.ToString("d19"), Guid.NewGuid().ToString());
+            // Use reverse time so that entries are sorted chronologically with latest entries appearing first
+            this.PartitionKey = String.Format("{0}_{1}", (DateTime.MaxValue - createdUtc).Ticks.ToString("d19"), Guid.NewGuid().ToString());
 
-        this.Timestamp = createdUtc;
-        this.InstanceId = RoleEnvironment.CurrentRoleInstance.Id;
-        this.EventName = eventName;
-        this.Details = details;
-        
+            this.RowKey = RoleEnvironment.DeploymentId;
+
+            this.Timestamp = createdUtc;
+            this.InstanceId = RoleEnvironment.CurrentRoleInstance.Id;
+            this.EventName = eventName;
+            this.Notes = notes;
+            this.RoleInstanceId = RoleEnvironment.CurrentRoleInstance.Id;
+            this.MachineName = Environment.MachineName;
+            this.Label = label;
+
+        }
+
+        public string InstanceId { get; set; }
+        public string EventName { get; set; }
+        public string Notes { get; set; }
+        public string RoleInstanceId { get; set; }
+        public string MachineName { get; set; }
+        public string Label { get; set; }
     }
-
-    public string InstanceId { get; set; }
-    public string EventName { get; set; }
-    public string Details { get; set; }
 }

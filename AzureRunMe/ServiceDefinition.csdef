@@ -28,14 +28,24 @@
       <Setting name="OnStopCommands" />
       <Setting name="DontExit" />
       <Setting name="DefaultConnectionLimit" />
+      
       <Setting name="DiagnosticsConnectionString" />
       <Setting name="ScheduledTransferLogLevelFilter" />
       <Setting name="ScheduledTransferPeriod" />
+      
       <Setting name="TraceConnectionString" />
       <Setting name="TraceFormat" />
+
+      <Setting name="UpdateIndicator" />
+      <Setting name="PreUpdateCommands" />
+      <Setting name="PreUpdateSleep" />
+      <Setting name="PostUpdateCommands" />
+      
       <Setting name="CloudDriveConnectionString" />
       <Setting name="CloudDrive" />
       <Setting name="CloudDriveSize" />
+      
+      <Setting name="LogTableName" />
       <Setting name="LogConnectionString" />
       <Setting name="Label" />
     </ConfigurationSettings>
