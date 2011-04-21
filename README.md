@@ -323,76 +323,15 @@ Whilst the CMD shell doesnt really have proper job control, you can start backgr
 Issues
 ------
 
-There are a number of Java apps that use the java.nio library to try to establish non blocking IO connections to the loopback adapter. This isnt allowed by the Windows Azure security policy.
-If you are working with Java, you might like to read http://www.robblackwell.org.uk/2010/11/06/java-on-windows-azure-roundup.html  NEEDS RETESTING AND REVALIDATING
-
-For compatability issues with specific applications, see below.
-
 Unfortunately we cant configure more that 5 end points on the Load balancer, so you may need to recompile with your own CSDEF file to fiddle with ports.
-The vmsize attribute is unfortunately, also baked into this file.
 
-Clojure + Compojure
--------------------
+The vmsize attribute is unfortunately, baked into the CSDEF file, so specifiying a different instance size also needs a recompile.
 
-Works as of Summer 2010
+When you RDP into AzureRunMe and start a web server from, say, a command prompt it may be that you can only see it locally on the VM and not
+via the load balancer. Not yet sure if this is an issue with process context or firewall rules. Currrent work around is that you must start
+your web server withing a runme.bat or similar so that AzureRunMe can start it as part of its Run method.
 
-Tomcat
-------
-
-Works.
-
-Restlet 
--------
-
-Works
-
-Jetty
------
-
-Runs, but not with NIO support. NEEDS RETESTING AND REVALIDATING
-
-JBOSS
------
-
-Not extensively tested, but a basic system comes up for web serving. Some issues I belive with JCA etc because it uses java.nio. NEEDS RETESTING AND REVALIDATING
-
-ApacheDS LDAP Server
---------------------
-
-Doesn't work because it uses java.nio NEEDS RETESTING AND REVALIDATING
-
-ANSI C Code, C++
-----------------
-
-With the appropriate Visual C++ runtime and libraries this is known to work.  You may need to install your VC++ runtime via Startup.cmd for legacy runtime redistributables.
-
-ADPlus Debugging tools
-----------------------
-
-Need a crash dump? See http://www.robblackwell.org.uk/2010/10/27/advanced-debugging-on-windows-azure-with-adplus.html
-
-SysInternals PSTools
---------------------
-
-Works.
-
-The trick is to use the /accepteula flag! Thanks to Jsun for this one!
-
-AzureCommandLineTools
----------------------
-
-UploadBlob adnd DownloadBlob have been replaced with a more comprehensive set of command line tools, see https://github.com/blackwre/AzureCommandLineTools.
-
-	> PutBlob myfilename mycontainer/myblob
-	> GetBlob mycontainer/myblob
-
-7Zip
-----
-
-That old swiss army knife 7 Zip http://www.7-zip.org/, works too. Thanks to Jsun for this one!
-
-	> 7zip x myfile.zip
-
+If you specify PreUpdate or PostUpdate commands and these block, then your role might go unhealthy and the fabric might restart your instance.
 
 Credits
 -------
@@ -401,7 +340,7 @@ SevenZipSharp http://sevenzipsharp.codeplex.com/ is distributed under the terms 
 
 TraceConsole and TraceListener are code samples from the Microsoft appFabric SDK (with minor modifications).
 
-Thanks to Jsun for lots of constructive ideas and testing to near destruction!
+Thanks to Jsun for lots of constructive ideas, feature requests and testing.
 
 Thanks to Michal Kruml for various patches.
 

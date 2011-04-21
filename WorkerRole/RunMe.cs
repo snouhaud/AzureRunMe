@@ -43,6 +43,8 @@ namespace WorkerRole
         bool isRoleStopping = false;
         bool roleIsBusy = false;
 
+        string approot;
+
         // Configuration setting keys
         const string TRACE_FORMAT = "TraceFormat";
         const string SCHEDULED_TRANSFER_PERIOD = "ScheduledTransferPeriod";
@@ -52,8 +54,8 @@ namespace WorkerRole
         const string WORKING_DIRECTORY = "WorkingDirectory";
         const string COMMANDS = "Commands";
         const string CLOUD_DRIVE_CONNECTION_STRING = "CloudDriveConnectionString";
-        const string CLOUD_DRIVE="CloudDrive";
-        const string CLOUD_DRIVE_SIZE="CloudDriveSize";
+        const string CLOUD_DRIVE = "CloudDrive";
+        const string CLOUD_DRIVE_SIZE = "CloudDriveSize";
         const string DEFAULT_CONNECTION_LIMIT = "DefaultConnectionLimit";
         const string LABEL = "Label";
         const string UPDATE_INDICATOR = "UpdateIndicator";
@@ -82,7 +84,7 @@ namespace WorkerRole
         /// </summary>
         private string ExpandKeywords(string buffer)
         {
-            buffer = buffer.Replace("$approot$", @"$roleroot$\approot");
+            buffer = buffer.Replace("$approot$", approot);
             buffer = buffer.Replace("$deploymentid$", RoleEnvironment.DeploymentId);
             buffer = buffer.Replace("$roleinstanceid$", RoleEnvironment.CurrentRoleInstance.Id);
             buffer = buffer.Replace("$computername$", Environment.MachineName);
@@ -101,7 +103,7 @@ namespace WorkerRole
         /// Configures the maximum number of concurrent outbound connections
         /// </summary>
         private void ConfigureDefaultConnectionLimit()
-        { 
+        {
             int limit = int.Parse(RoleEnvironment.GetConfigurationSettingValue(DEFAULT_CONNECTION_LIMIT));
             ServicePointManager.DefaultConnectionLimit = limit;
 
@@ -146,12 +148,12 @@ namespace WorkerRole
             // Event Logs
             diagnosticMonitorConfiguration.WindowsEventLog.DataSources.Add("System!*");
             diagnosticMonitorConfiguration.WindowsEventLog.DataSources.Add("Application!*");
-            
+
             // NB Dont do this -> config.WindowsEventLog.DataSources.Add("Security!*");
 
-            diagnosticMonitorConfiguration.WindowsEventLog.ScheduledTransferLogLevelFilter = logLevel; 
+            diagnosticMonitorConfiguration.WindowsEventLog.ScheduledTransferLogLevelFilter = logLevel;
             diagnosticMonitorConfiguration.WindowsEventLog.ScheduledTransferPeriod = scheduledTransferPeriod;
- 
+
             // Basic Logs
             diagnosticMonitorConfiguration.Logs.ScheduledTransferLogLevelFilter = logLevel;
             diagnosticMonitorConfiguration.Logs.ScheduledTransferPeriod = scheduledTransferPeriod;
@@ -263,7 +265,7 @@ namespace WorkerRole
             CloudStorageAccount storageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING));
 
             CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
-            
+
             blobClient.RetryPolicy = RetryPolicies.Retry(100, TimeSpan.FromSeconds(1));
             blobClient.Timeout = TimeSpan.FromSeconds(600);
 
@@ -279,6 +281,9 @@ namespace WorkerRole
                 Tracer.WriteLine(string.Format("Extracting {0}", packageName), "Information");
 
                 SevenZipExtractor extractor = new SevenZipExtractor(stream);
+                // set 7zip dll path
+                string sevenZipPath = Path.Combine(Directory.GetCurrentDirectory(), @"Redist\7z64.dll");
+                SevenZipExtractor.SetLibraryPath(sevenZipPath);
                 extractor.ExtractArchive(workingDirectory);
             }
 
@@ -311,28 +316,28 @@ namespace WorkerRole
             // See http://blogs.msdn.com/b/windowsazurestorage/archive/2010/12/17/error-unsupported-os-seen-with-windows-azure-drives.aspx
             for (int i = 0; i < TRIES; i++)
             {
-                   try
-                   {
-                       CloudDrive.InitializeCache(localCache.RootPath, localCache.MaximumSizeInMegabytes);
-                       break;                   
-                   }
-                   catch (CloudDriveException ex)
-                   {
-                       if (!ex.Message.Equals("ERROR_UNSUPPORTED_OS"))
-                       {
-                           throw;
-                       }
+                try
+                {
+                    CloudDrive.InitializeCache(localCache.RootPath, localCache.MaximumSizeInMegabytes);
+                    break;
+                }
+                catch (CloudDriveException ex)
+                {
+                    if (!ex.Message.Equals("ERROR_UNSUPPORTED_OS"))
+                    {
+                        throw;
+                    }
 
-                       if (i >= (TRIES - 1))
-                       {
-                           // If the workaround fails then it would be dangerous to continue silently, so exit 
-                           Tracer.WriteLine("Workaround for ERROR_UNSUPPORTED_OS see http://bit.ly/fw7qzo FAILED", "Error");
-                           System.Environment.Exit(-1);
-                       }
+                    if (i >= (TRIES - 1))
+                    {
+                        // If the workaround fails then it would be dangerous to continue silently, so exit 
+                        Tracer.WriteLine("Workaround for ERROR_UNSUPPORTED_OS see http://bit.ly/fw7qzo FAILED", "Error");
+                        System.Environment.Exit(-1);
+                    }
 
-                       Tracer.WriteLine("Using temporary workaround for ERROR_UNSUPPORTED_OS see http://bit.ly/fw7qzo", "Information");
-                       Thread.Sleep(10000);
-                   }
+                    Tracer.WriteLine("Using temporary workaround for ERROR_UNSUPPORTED_OS see http://bit.ly/fw7qzo", "Information");
+                    Thread.Sleep(10000);
+                }
             }
 
             CloudStorageAccount cloudDriveStorageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue(CLOUD_DRIVE_CONNECTION_STRING));
@@ -400,7 +405,7 @@ namespace WorkerRole
                 string value = endpoint.Value.IPEndpoint.Port.ToString();
 
                 SetEnvironmentVariable(startInfo, variable, value);
-                
+
                 if (!startInfo.EnvironmentVariables.ContainsKey(IP_ADDRESS))
                 {
                     string ipAddress = endpoint.Value.IPEndpoint.Address.ToString();
@@ -444,10 +449,12 @@ namespace WorkerRole
         {
             return ExpandKeywords(RoleEnvironment.GetConfigurationSettingValue("WorkingDirectory"));
         }
-        
+
         public bool OnStart()
         {
             log.WriteEntry("OnStart", "", GetLabel());
+
+            approot = Directory.GetCurrentDirectory();
 
             ConfigureTraceFormat();
 
@@ -463,17 +470,22 @@ namespace WorkerRole
 
             ConfigureDefaultConnectionLimit();
 
-            // If a TraceConnectionString is specified then start a TraceConsole via the AppFabric Service Bus
-            string traceConnectionString = RoleEnvironment.GetConfigurationSettingValue("TraceConnectionString");
-            if (!String.IsNullOrEmpty(traceConnectionString))
-                InitialiseTraceConsole(traceConnectionString);
+            Trace.AutoFlush = true;
 
             // Trace to Azure Diagnostics (table storage).
             DiagnosticMonitorTraceListener diagnosticMonitorTraceListener = new DiagnosticMonitorTraceListener();
             Trace.Listeners.Add(diagnosticMonitorTraceListener);
 
-            Trace.AutoFlush = true;
+            Tracer.WriteLine("Added DiagnosticMonitorTraceListener", "Information");
 
+            // If a TraceConnectionString is specified then start a TraceConsole via the AppFabric Service Bus
+            string traceConnectionString = RoleEnvironment.GetConfigurationSettingValue("TraceConnectionString");
+            if (!String.IsNullOrEmpty(traceConnectionString))
+                InitialiseTraceConsole(traceConnectionString);
+
+            Tracer.WriteLine("Added CloudTraceListener", "Information");
+
+            Tracer.WriteLine("OnStart completed", "Information");
             return true;
         }
 
@@ -544,7 +556,7 @@ namespace WorkerRole
         {
             string commands = RoleEnvironment.GetConfigurationSettingValue(COMMANDS);
             return RunCommands(commands);
-            
+
         }
 
         public void Run()
@@ -556,23 +568,21 @@ namespace WorkerRole
             Tracer.WriteLine("Copyright (c) 2010 - 2011 Active Web Solutions Ltd [www.aws.net]", "Information");
             Tracer.WriteLine("", "Information");
 
-            Tracer.WriteLine(string.Format("Label: {0}",GetLabel()), "Information");
+            Tracer.WriteLine(string.Format("Label: {0}", GetLabel()), "Information");
 
             Tracer.WriteLine(string.Format("DeploymentId: {0}", RoleEnvironment.DeploymentId), "Information");
             Tracer.WriteLine(string.Format("RoleInstanceId: {0}", RoleEnvironment.CurrentRoleInstance.Id), "Information");
             Tracer.WriteLine(string.Format("MachineName: {0}", Environment.MachineName), "Information");
             Tracer.WriteLine(string.Format("ProcessorCount: {0}", Environment.ProcessorCount), "Information");
             Tracer.WriteLine(string.Format("Time: {0}", DateTime.Now), "Information");
-            
+
             try
             {
 
                 MountCloudDrive();
 
-                string workingDirectory = GetWorkingDirectory();
-
                 // set 7zip dll path
-                string sevenZipPath = Path.Combine(workingDirectory, @"Redist\7z64.dll");
+                string sevenZipPath = Path.Combine(approot, @"Redist\7z64.dll");
                 SevenZipExtractor.SetLibraryPath(sevenZipPath);
 
                 InstallPackages();
@@ -630,7 +640,8 @@ namespace WorkerRole
 
             foreach (string assignment in assignments)
             {
-                if (!String.IsNullOrEmpty(assignment)) {
+                if (!String.IsNullOrEmpty(assignment))
+                {
                     string[] parts = assignment.Split('=');
                     SetEnvironmentVariable(processStartInfo, parts[0].Trim(), parts[1].Trim());
                 }
@@ -665,7 +676,7 @@ namespace WorkerRole
                     {
                         Process process = Run(workingDirectory, environmentVariables, command);
                         processes.Add(process);
-                        Tracer.WriteLine(string.Format("Process {0} started,({1})",  process.Handle, command), "Information");
+                        Tracer.WriteLine(string.Format("Process {0} started,({1})", process.Handle, command), "Information");
                     }
                 }
                 catch (Exception e)
@@ -721,7 +732,7 @@ namespace WorkerRole
 
             commands = RoleEnvironment.GetConfigurationSettingValue(POST_UPDATE_COMMANDS);
             processes = RunCommands(commands);
-    
+
             roleIsBusy = false;
 
             Tracer.WriteLine("DoUpdate Finished", "Information");
@@ -729,7 +740,7 @@ namespace WorkerRole
 
         private void RoleEnvironmentStopping(object sender, RoleEnvironmentStoppingEventArgs e)
         {
-            Tracer.WriteLine("RoleEnvironmentStopping " , "Information");
+            Tracer.WriteLine("RoleEnvironmentStopping ", "Information");
             log.WriteEntry("RoleEnvironmentStopping", "", GetLabel());
         }
 
@@ -806,6 +817,6 @@ namespace WorkerRole
 
             if (update)
                 DoUpdate();
-        }        
+        }
     }
 }
