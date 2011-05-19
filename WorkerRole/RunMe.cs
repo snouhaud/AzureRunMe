@@ -165,6 +165,8 @@ namespace WorkerRole
             // Start the diagnostic monitor with the modified configuration.
             DiagnosticMonitor.Start("DiagnosticsConnectionString", diagnosticMonitorConfiguration);
 
+            Tracer.WriteLine("DiagnosticMonitor started", "Information");
+
         }
 
         public void InitialiseTraceConsole(string traceConnectionString)
@@ -456,7 +458,20 @@ namespace WorkerRole
 
             approot = Directory.GetCurrentDirectory();
 
+            // If a TraceConnectionString is specified then start a TraceConsole via the AppFabric Service Bus
+            string traceConnectionString = RoleEnvironment.GetConfigurationSettingValue("TraceConnectionString");
+            if (!String.IsNullOrEmpty(traceConnectionString))
+                InitialiseTraceConsole(traceConnectionString);
+
             ConfigureTraceFormat();
+
+            Tracer.WriteLine("OnStart", "Information");
+            Trace.AutoFlush = true;
+
+            Tracer.WriteLine("", "Information");
+            Tracer.WriteLine(string.Format("AzureRunMe {0}", GetVersion()), "Information");
+            Tracer.WriteLine("Copyright (c) 2010 - 2011 Active Web Solutions Ltd [www.aws.net]", "Information");
+            Tracer.WriteLine("", "Information");
 
             ConfigureDiagnostics();
 
@@ -470,22 +485,39 @@ namespace WorkerRole
 
             ConfigureDefaultConnectionLimit();
 
-            Trace.AutoFlush = true;
-
             // Trace to Azure Diagnostics (table storage).
             DiagnosticMonitorTraceListener diagnosticMonitorTraceListener = new DiagnosticMonitorTraceListener();
             Trace.Listeners.Add(diagnosticMonitorTraceListener);
 
             Tracer.WriteLine("Added DiagnosticMonitorTraceListener", "Information");
 
-            // If a TraceConnectionString is specified then start a TraceConsole via the AppFabric Service Bus
-            string traceConnectionString = RoleEnvironment.GetConfigurationSettingValue("TraceConnectionString");
-            if (!String.IsNullOrEmpty(traceConnectionString))
-                InitialiseTraceConsole(traceConnectionString);
+            Tracer.WriteLine(string.Format("Label: {0}", GetLabel()), "Information");
 
-            Tracer.WriteLine("Added CloudTraceListener", "Information");
+            Tracer.WriteLine(string.Format("DeploymentId: {0}", RoleEnvironment.DeploymentId), "Information");
+            Tracer.WriteLine(string.Format("RoleInstanceId: {0}", RoleEnvironment.CurrentRoleInstance.Id), "Information");
+            Tracer.WriteLine(string.Format("MachineName: {0}", Environment.MachineName), "Information");
+            Tracer.WriteLine(string.Format("ProcessorCount: {0}", Environment.ProcessorCount), "Information");
+            Tracer.WriteLine(string.Format("Time: {0}", DateTime.Now), "Information");
 
-            Tracer.WriteLine("OnStart completed", "Information");
+            try
+            {
+                MountCloudDrive();
+
+                // set 7zip dll path
+                string sevenZipPath = Path.Combine(approot, @"Redist\7z64.dll");
+                SevenZipExtractor.SetLibraryPath(sevenZipPath);
+
+                InstallPackages();
+            }
+            catch (Exception e)
+            {
+                Tracer.WriteLine(e, "Error");
+            }
+
+            Tracer.WriteLine("Started", "Information");
+
+            log.WriteEntry("Started", "", GetLabel());
+
             return true;
         }
 
@@ -561,31 +593,11 @@ namespace WorkerRole
 
         public void Run()
         {
-            Tracer.WriteLine("WorkerRole entry point called", "Information");
-            log.WriteEntry("Run", "", GetLabel());
-
-            Tracer.WriteLine(string.Format("AzureRunMe {0}", GetVersion()), "Information");
-            Tracer.WriteLine("Copyright (c) 2010 - 2011 Active Web Solutions Ltd [www.aws.net]", "Information");
-            Tracer.WriteLine("", "Information");
-
-            Tracer.WriteLine(string.Format("Label: {0}", GetLabel()), "Information");
-
-            Tracer.WriteLine(string.Format("DeploymentId: {0}", RoleEnvironment.DeploymentId), "Information");
-            Tracer.WriteLine(string.Format("RoleInstanceId: {0}", RoleEnvironment.CurrentRoleInstance.Id), "Information");
-            Tracer.WriteLine(string.Format("MachineName: {0}", Environment.MachineName), "Information");
-            Tracer.WriteLine(string.Format("ProcessorCount: {0}", Environment.ProcessorCount), "Information");
-            Tracer.WriteLine(string.Format("Time: {0}", DateTime.Now), "Information");
+            Tracer.WriteLine("Running", "Information");
+            log.WriteEntry("Running", "", GetLabel());
 
             try
             {
-
-                MountCloudDrive();
-
-                // set 7zip dll path
-                string sevenZipPath = Path.Combine(approot, @"Redist\7z64.dll");
-                SevenZipExtractor.SetLibraryPath(sevenZipPath);
-
-                InstallPackages();
 
                 WaitForCommandsExit(RunCommands());
 
@@ -607,7 +619,8 @@ namespace WorkerRole
                 Tracer.WriteLine(e, "Error");
             }
 
-            Tracer.WriteLine("WorkerRole exit", "Critical");
+            Tracer.WriteLine("Stopping", "Critical");
+            log.WriteEntry("Stopping", "", GetLabel());
         }
 
         private void UnmountCloudDrive()
@@ -631,7 +644,8 @@ namespace WorkerRole
 
             UnmountCloudDrive();
 
-            Tracer.WriteLine("OnStop Finished", "Critical");
+            Tracer.WriteLine("Stopped", "Critical");
+            log.WriteEntry("Stopped", "", GetLabel());
         }
 
         private void EnvironmentVariables(ProcessStartInfo processStartInfo, string environmentVariables)
