@@ -13,7 +13,6 @@
       <Setting name="OnStopCommands" value="stop.bat" />
       <Setting name="DontExit" value="true" />
       <Setting name="DefaultConnectionLimit" value="12" />
-      <Setting name="DiagnosticsConnectionString" value="DefaultEndpointsProtocol=https;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
       <Setting name="ScheduledTransferLogLevelFilter" value="Verbose" />
       <Setting name="ScheduledTransferPeriod" value="1" />
       <Setting name="TraceConnectionString" value="ServicePath=trace/$roleinstanceid$;ServiceNamespace=YOURNAMESPACE;IssuerName=YOURISSUERNAME;IssuerSecret=YOURISSUERSECRET" />
@@ -32,6 +31,7 @@
       <Setting name="Microsoft.WindowsAzure.Plugins.RemoteAccess.AccountEncryptedPassword" value="MIIBmAYJKoZIhvcNAQcDoIIBiTCCAYUCAQAxggFJMIIBRQIBADAtMBkxFzAVBgNVBAMTDkF6dXJlUnVuTWUgUkRQAhD1HpjSeY5puUQ2/L1NhTbsMA0GCSqGSIb3DQEBAQUABIIBABb6ivBJ2XGKknUBXnf9RD/AndB+maY2S4j7TBVMJd4Yr//0nws+7/Cbx+1ZQ4oHa8VMnHz7eOk5quidaBLlZrBZpIM9trD6XW5ZgG9Nsci2u3dEHxQbQrwPmCijP6iQx4UZbkotQprMPXQ9CAXy6QkZmsp0uk1EXnFUpL4SjMjemh1vTcaiunTCrpHM0BAThcIzC6kan4Bi/xIkkrUBwTKmbgth9k0deVxPv3cxhadYzW34cxX6Ji66+3kj4WZxOSFj2Ej3mdiBFuy7YvasD8niDD5PxjYKDrJRC2T2pR/783Ydm12XE1gtr5yEQOwsQfpbNdYulIs+Ww+0qpsaSHkwMwYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAiy+y2C2+GsXIAQUR0JEnHDdg9Kri35F9TYWw==" />
       <Setting name="Microsoft.WindowsAzure.Plugins.RemoteAccess.AccountExpiration" value="2015-12-01T23:59:59.0000000+00:00" />
       <Setting name="Microsoft.WindowsAzure.Plugins.RemoteForwarder.Enabled" value="true" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="DefaultEndpointsProtocol=https;AccountName=YOURACCOUNTNAME;AccountKey=YOURACCOUNTKEY" />
     </ConfigurationSettings>
     <Certificates>
       <Certificate name="Microsoft.WindowsAzure.Plugins.RemoteAccess.PasswordEncryption" thumbprint="E16E8C182ECE44B5B1E3742955A5D022BB6F30B2" thumbprintAlgorithm="sha1" />

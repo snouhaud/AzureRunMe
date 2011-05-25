@@ -28,6 +28,7 @@ using Microsoft.WindowsAzure.Diagnostics;
 using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.StorageClient;
 using SevenZip;
+using Microsoft.WindowsAzure.Diagnostics.Management;
 
 
 namespace WorkerRole
@@ -122,50 +123,45 @@ namespace WorkerRole
         {
             Tracer.WriteLine("ConfigureDiagnostics", "Information");
 
-            DiagnosticMonitorConfiguration diagnosticMonitorConfiguration = DiagnosticMonitor.GetDefaultInitialConfiguration();
-
-            LogLevel logLevel = (LogLevel)Enum.Parse(typeof(LogLevel), RoleEnvironment.GetConfigurationSettingValue(SCHEDULED_TRANSFER_LOG_LEVEL_FILTER));
-            TimeSpan scheduledTransferPeriod = TimeSpan.FromMinutes(int.Parse(RoleEnvironment.GetConfigurationSettingValue(SCHEDULED_TRANSFER_PERIOD)));
-
-            // Windows Performance Counters
-            List<string> counters = new List<string>();
-            counters.Add(@"\Processor(_Total)\% Processor Time");
-            counters.Add(@"\Memory\Available Mbytes");
-            counters.Add(@"\TCPv4\Connections Established");
-            counters.Add(@"\Network Interface(*)\Bytes Received/sec");
-            counters.Add(@"\Network Interface(*)\Bytes Sent/sec");
-
-            foreach (string counter in counters)
+            try
             {
-                PerformanceCounterConfiguration counterConfig = new PerformanceCounterConfiguration();
-                counterConfig.CounterSpecifier = counter;
-                counterConfig.SampleRate = scheduledTransferPeriod;
-                diagnosticMonitorConfiguration.PerformanceCounters.DataSources.Add(counterConfig);
+                CloudStorageAccount cloudStorageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue("Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString"));
+
+                RoleInstanceDiagnosticManager roleInstanceDiagnosticManager = cloudStorageAccount.CreateRoleInstanceDiagnosticManager(RoleEnvironment.DeploymentId,
+                    RoleEnvironment.CurrentRoleInstance.Role.Name,
+                    RoleEnvironment.CurrentRoleInstance.Id);
+
+                DiagnosticMonitorConfiguration diagnosticMonitorConfiguration = roleInstanceDiagnosticManager.GetCurrentConfiguration();
+
+                if (diagnosticMonitorConfiguration == null)
+                {
+                    Tracer.WriteLine("There is no CurrentConfiguration for Windows Azure Diagnostics, using DefaultInitialConfiguration", "Information");
+                    diagnosticMonitorConfiguration = DiagnosticMonitor.GetDefaultInitialConfiguration();
+                }
+
+                diagnosticMonitorConfiguration.Directories.ScheduledTransferPeriod = TimeSpan.FromMinutes(9.0);
+                roleInstanceDiagnosticManager.SetCurrentConfiguration(diagnosticMonitorConfiguration);
+
+                LogLevel logLevel = (LogLevel)Enum.Parse(typeof(LogLevel), RoleEnvironment.GetConfigurationSettingValue(SCHEDULED_TRANSFER_LOG_LEVEL_FILTER));
+                TimeSpan scheduledTransferPeriod = TimeSpan.FromMinutes(int.Parse(RoleEnvironment.GetConfigurationSettingValue(SCHEDULED_TRANSFER_PERIOD)));
+
+                diagnosticMonitorConfiguration.PerformanceCounters.ScheduledTransferPeriod = scheduledTransferPeriod;
+                diagnosticMonitorConfiguration.WindowsEventLog.ScheduledTransferLogLevelFilter = logLevel;
+                diagnosticMonitorConfiguration.WindowsEventLog.ScheduledTransferPeriod = scheduledTransferPeriod;
+                diagnosticMonitorConfiguration.Logs.ScheduledTransferLogLevelFilter = logLevel;
+                diagnosticMonitorConfiguration.Logs.ScheduledTransferPeriod = scheduledTransferPeriod;
+
+                roleInstanceDiagnosticManager.SetCurrentConfiguration(diagnosticMonitorConfiguration);
+
+            }
+            catch (Exception e)
+            {
+                Tracer.WriteLine(e, "Error");
             }
 
-            diagnosticMonitorConfiguration.PerformanceCounters.ScheduledTransferPeriod = scheduledTransferPeriod;
+            
 
-            // Event Logs
-            diagnosticMonitorConfiguration.WindowsEventLog.DataSources.Add("System!*");
-            diagnosticMonitorConfiguration.WindowsEventLog.DataSources.Add("Application!*");
-
-            // NB Dont do this -> config.WindowsEventLog.DataSources.Add("Security!*");
-
-            diagnosticMonitorConfiguration.WindowsEventLog.ScheduledTransferLogLevelFilter = logLevel;
-            diagnosticMonitorConfiguration.WindowsEventLog.ScheduledTransferPeriod = scheduledTransferPeriod;
-
-            // Basic Logs
-            diagnosticMonitorConfiguration.Logs.ScheduledTransferLogLevelFilter = logLevel;
-            diagnosticMonitorConfiguration.Logs.ScheduledTransferPeriod = scheduledTransferPeriod;
-
-            // NB Only enables crash dumps for the worker role, not crash dumps for spawned processes
-            // See http://www.robblackwell.org.uk/2010/10/27/advanced-debugging-on-windows-azure-with-adplus.html
-            CrashDumps.EnableCollection(true);
-
-            // Start the diagnostic monitor with the modified configuration.
-            DiagnosticMonitor.Start("DiagnosticsConnectionString", diagnosticMonitorConfiguration);
-
-            Tracer.WriteLine("DiagnosticMonitor started", "Information");
+            Tracer.WriteLine("Windows Azure Diagnostics updated", "Information");
 
         }
 
