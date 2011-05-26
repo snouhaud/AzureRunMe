@@ -481,12 +481,6 @@ namespace WorkerRole
 
             ConfigureDefaultConnectionLimit();
 
-            // Trace to Azure Diagnostics (table storage).
-            DiagnosticMonitorTraceListener diagnosticMonitorTraceListener = new DiagnosticMonitorTraceListener();
-            Trace.Listeners.Add(diagnosticMonitorTraceListener);
-
-            Tracer.WriteLine("Added DiagnosticMonitorTraceListener", "Information");
-
             Tracer.WriteLine(string.Format("Label: {0}", GetLabel()), "Information");
 
             Tracer.WriteLine(string.Format("DeploymentId: {0}", RoleEnvironment.DeploymentId), "Information");

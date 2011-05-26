@@ -1,28 +1,48 @@
 ﻿<DiagnosticMonitorConfiguration xmlns="http://schemas.microsoft.com/ServiceHosting/2010/10/DiagnosticsConfiguration"
       configurationChangePollInterval="PT1M"
       overallQuotaInMB="4096">
-  <DiagnosticInfrastructureLogs bufferQuotaInMB="1024"
+  
+  <DiagnosticInfrastructureLogs bufferQuotaInMB="512"
      scheduledTransferLogLevelFilter="Verbose"
      scheduledTransferPeriod="PT1M" />
-  <Logs bufferQuotaInMB="1024"
+  
+  <Logs bufferQuotaInMB="512"
      scheduledTransferLogLevelFilter="Verbose"
      scheduledTransferPeriod="PT1M" />
-  <Directories bufferQuotaInMB="1024"
-     scheduledTransferPeriod="PT1M">>
+  
+  <Directories bufferQuotaInMB="512"
+     scheduledTransferPeriod="PT1M">
     <CrashDumps container="wad-crash-dumps" directoryQuotaInMB="256" />
   </Directories>
+  
   <PerformanceCounters bufferQuotaInMB="512" scheduledTransferPeriod="PT1M">
     <!-- The counter specifier is in the same format as the imperative 
            diagnostics configuration API -->
     <PerformanceCounterConfiguration
        counterSpecifier="\Processor(_Total)\% Processor Time" sampleRate="PT5S" />
+
+    <PerformanceCounterConfiguration
+         counterSpecifier="\Memory\Available Mbytes" sampleRate="PT5S" />
+
+    <PerformanceCounterConfiguration
+         counterSpecifier="\TCPv4\Connections Established" sampleRate="PT5S" />
+
+    <PerformanceCounterConfiguration
+         counterSpecifier="\Network Interface(*)\Bytes Received/sec" sampleRate="PT5S" />
+
+    <PerformanceCounterConfiguration
+         counterSpecifier="\Network Interface(*)\Bytes Sent/sec" sampleRate="PT5S" />
+
   </PerformanceCounters>
+  
   <WindowsEventLog bufferQuotaInMB="512"
      scheduledTransferLogLevelFilter="Verbose"
      scheduledTransferPeriod="PT1M">
     <!-- The event log name is in the same format as the imperative 
            diagnostics configuration API -->
     <DataSource name="Application!*" />
+    <DataSource name="System!*"/>
   </WindowsEventLog>
+  
 </DiagnosticMonitorConfiguration>
 
