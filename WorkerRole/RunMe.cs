@@ -25,10 +25,11 @@ using System.Threading;
 using Microsoft.ServiceBus.Samples;
 using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.Diagnostics;
+using Microsoft.WindowsAzure.Diagnostics.Management;
 using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.StorageClient;
 using SevenZip;
-using Microsoft.WindowsAzure.Diagnostics.Management;
+using System.Xml;
 
 
 namespace WorkerRole
@@ -42,7 +43,7 @@ namespace WorkerRole
         List<Process> processes = null;
 
         bool isRoleStopping = false;
-        bool roleIsBusy = false;
+        bool roleIsBusy = true;
 
         string approot;
 
@@ -71,12 +72,26 @@ namespace WorkerRole
             log = new Log(RoleEnvironment.GetConfigurationSettingValue(LOG_CONNECTION_STRING));
         }
 
-        /// <summary>
-        /// Get the version from the Assembly Information
-        /// </summary>
-        public static string GetVersion()
+        public static string GetAzureRunMeVersion()
         {
             return new AssemblyName(Assembly.GetExecutingAssembly().FullName).Version.ToString();
+        }
+
+        public string GetWindowsAzureSDKVersion()
+        {
+            try
+            {
+                // Warning this is undocumented and could break in a future SDK release
+                string roleModelFile = Environment.GetEnvironmentVariable("RoleRoot") + "\\RoleModel.xml";
+                XmlDocument xmlDocument = new XmlDocument();
+                xmlDocument.Load(roleModelFile);
+
+                return xmlDocument.GetElementsByTagName("RoleModel")[0].Attributes["version"].Value;
+            }
+            catch (Exception e)
+            {
+                return "unknown";
+            }
         }
 
         /// <summary>
@@ -92,7 +107,7 @@ namespace WorkerRole
             buffer = buffer.Replace("$guid$", Guid.NewGuid().ToString());
             buffer = buffer.Replace("$now$", DateTime.Now.ToString());
             buffer = buffer.Replace("$roleroot$", Environment.GetEnvironmentVariable("RoleRoot"));
-            buffer = buffer.Replace("$version$", GetVersion());
+            buffer = buffer.Replace("$version$", GetAzureRunMeVersion());
 
             if (cloudDrive != null)
                 buffer = buffer.Replace("$clouddrive$", cloudDrive.LocalPath);
@@ -465,7 +480,9 @@ namespace WorkerRole
             Trace.AutoFlush = true;
 
             Tracer.WriteLine("", "Information");
-            Tracer.WriteLine(string.Format("AzureRunMe {0}", GetVersion()), "Information");
+            Tracer.WriteLine(string.Format("AzureRunMe {0} on Windows Azure SDK {1}", 
+                GetAzureRunMeVersion(), GetWindowsAzureSDKVersion()), "Information");
+
             Tracer.WriteLine("Copyright (c) 2010 - 2011 Active Web Solutions Ltd [www.aws.net]", "Information");
             Tracer.WriteLine("", "Information");
 
@@ -498,6 +515,9 @@ namespace WorkerRole
                 SevenZipExtractor.SetLibraryPath(sevenZipPath);
 
                 InstallPackages();
+
+                string commands = RoleEnvironment.GetConfigurationSettingValue("OnStartCommands");
+                WaitForCommandsExit(RunCommands(commands));
             }
             catch (Exception e)
             {
@@ -583,6 +603,8 @@ namespace WorkerRole
 
         public void Run()
         {
+            roleIsBusy = false;
+
             Tracer.WriteLine("Running", "Information");
             log.WriteEntry("Running", "", GetLabel());
 

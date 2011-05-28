@@ -9,6 +9,7 @@
       <Setting name="AlwaysInstallPackages" value="true" />
       <Setting name="WorkingDirectory" value="$approot$" />
       <Setting name="EnvironmentVariables" value="azurerunme=true;pi=3.14" />
+      <Setting name="OnStartCommands" value="start.bat" />
       <Setting name="Commands" value="runme.bat" />
       <Setting name="OnStopCommands" value="stop.bat" />
       <Setting name="DontExit" value="true" />

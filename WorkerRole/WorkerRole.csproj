@@ -150,6 +150,7 @@
   <ItemGroup>
     <Content Include="diagnostics.wadcfg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
     </Content>
     <None Include="App.config" />
     <None Include="Startup.cmd">
