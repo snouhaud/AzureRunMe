@@ -212,20 +212,14 @@ namespace WorkerRole
             Trace.Listeners.Add(cloudTraceListener);
         }
 
-        private string PackageReceiptFileName(string packageName)
-        {
-            string directory = Environment.GetEnvironmentVariable("RoleRoot");
-            return Path.Combine(directory, packageName + ".receipt");
-        }
+        
 
         /// <summary>
         /// Creates a package receipt (a simple text file in the temp directory) 
         /// to record the successful download and installation of a package
         /// </summary>
-        private void WritePackageReceipt(string packageName)
+        private void WritePackageReceipt(string receiptFileName)
         {
-            string receiptFileName = PackageReceiptFileName(packageName);
-
             TextWriter textWriter = new StreamWriter(receiptFileName);
             textWriter.WriteLine(DateTime.Now);
             textWriter.Close();
@@ -237,7 +231,7 @@ namespace WorkerRole
         /// Checks a package in Blob Storage against any previous package receipt
         /// to determine whether to reinstall it
         /// </summary>
-        private bool IsNewPackage(string containerName, string packageName)
+        private bool IsNewPackage(string containerName, string packageName, string packageReceiptFile)
         {
             var storageAccount = CloudStorageAccount.Parse(RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING));
 
@@ -252,7 +246,7 @@ namespace WorkerRole
             blob.FetchAttributes();
             DateTime blobTimeStamp = blob.Attributes.Properties.LastModifiedUtc;
 
-            DateTime fileTimeStamp = File.GetCreationTimeUtc(PackageReceiptFileName(packageName));
+            DateTime fileTimeStamp = File.GetCreationTimeUtc(packageReceiptFile);
 
             if (fileTimeStamp.CompareTo(blobTimeStamp) < 0)
             {
@@ -555,10 +549,12 @@ namespace WorkerRole
                         string containerName = fields[0];
                         string packageName = fields[1];
 
-                        if (alwaysInstallPackages || IsNewPackage(containerName, packageName))
+                        string packageReceiptFileName = Path.Combine(workingDirectory, packageName + ".receipt");
+
+                        if (alwaysInstallPackages || IsNewPackage(containerName, packageName,packageReceiptFileName))
                         {
                             InstallPackage(containerName, packageName, workingDirectory);
-                            WritePackageReceipt(packageName);
+                            WritePackageReceipt(packageReceiptFileName);
                         }
                     }
                 }
