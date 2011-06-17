@@ -66,6 +66,9 @@ namespace WorkerRole
         const string PRE_UPDATE_COMMANDS = "PreUpdateCommands";
         const string LOG_CONNECTION_STRING = "LogConnectionString";
         const string DONT_EXIT = "DontExit";
+        const string IS_LOOP = "Loop";
+        const string LOOP_WAIT = "LoopWait";
+
 
         public RunMe()
         {
@@ -388,6 +391,7 @@ namespace WorkerRole
             const string DEPLOYMENT_ID = "deploymentid";
             const string ROLE_INSTANCE_ID = "roleinstanceid";
             const string CLOUD_DRIVE = "clouddrive";
+            const string APPROOT = "approot";
 
             string command = Path.Combine(
                     workingDirectory,
@@ -422,6 +426,8 @@ namespace WorkerRole
 
             SetEnvironmentVariable(startInfo, DEPLOYMENT_ID, RoleEnvironment.DeploymentId);
             SetEnvironmentVariable(startInfo, ROLE_INSTANCE_ID, RoleEnvironment.CurrentRoleInstance.Id);
+            SetEnvironmentVariable(startInfo, APPROOT, approot);
+
 
             if (cloudDrive != null)
             {
@@ -607,7 +613,20 @@ namespace WorkerRole
             try
             {
 
-                WaitForCommandsExit(RunCommands());
+                bool isLoop = bool.Parse(RoleEnvironment.GetConfigurationSettingValue(IS_LOOP));
+                if (isLoop)
+                {
+                    while (true)
+                    {
+                        WaitForCommandsExit(RunCommands());
+                        Thread.Sleep(1000 * Int32.Parse(RoleEnvironment.GetConfigurationSettingValue(LOOP_WAIT)));
+                    }
+                }
+                else
+                {
+                    WaitForCommandsExit(RunCommands());
+                }
+
 
                 // If DontExit is set, then keep runing even though all the Commands have finished
                 // (Useful if you want to RDP in afterwards). 
